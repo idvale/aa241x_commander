@@ -11,6 +11,7 @@
 
 // topic data
 #include <geometry_msgs/PoseStamped.h>
+#include <sensor_msgs/BatteryState.h>
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/PositionTarget.h>
 
@@ -44,6 +45,7 @@ private:
 	// data
 	mavros_msgs::State _current_state;
 	geometry_msgs::PoseStamped _current_local_pos;
+	sensor_msgs::BatteryState _battery_state;
 
 	// offset information
 	float _e_offset = 0.0f;
@@ -55,6 +57,7 @@ private:
 	ros::Subscriber _local_pos_sub;		// local position information
 	ros::Subscriber _sensor_meas_sub;	// mission sensor measurement
 	ros::Subscriber _mission_state_sub; // mission state
+	ros::Subscriber _battery_sub;		// the current battery information
 	// TODO: add subscribers here
 
 	// publishers
@@ -91,6 +94,13 @@ private:
 	 */
 	void missionStateCallback(const aa241x_mission::MissionState::ConstPtr& msg);
 
+	/**
+	 * callback for the battery information from the Pixhawk.
+	 * @param msg the sensor message containing the battery data
+	 *     (http://docs.ros.org/api/sensor_msgs/html/msg/BatteryState.html)
+	 */
+	void batteryCallback(const sensor_msgs::BatteryState::ConstPtr& msg);
+
 	// TODO: add callbacks here
 
 	// helper functions
@@ -104,6 +114,7 @@ MissionNode::MissionNode() {
 	_state_sub = _nh.subscribe<mavros_msgs::State>("mavros/state", 1, &MissionNode::stateCallback, this);
 	_local_pos_sub = _nh.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &MissionNode::localPosCallback, this);
 	_sensor_meas_sub =_nh.subscribe<aa241x_mission::SensorMeasurement>("measurement", 10, &MissionNode::sensorMeasCallback, this);
+	_battery_sub =_nh.subscribe<sensor_msgs::BatteryState>("mavros/battery", 10, &MissionNode::batteryCallback, this);
 
 	// advertise the published detailed
 }
@@ -138,6 +149,17 @@ void MissionNode::missionStateCallback(const aa241x_mission::MissionState::Const
 	_e_offset = msg->e_offset;
 	_n_offset = msg->n_offset;
 	_u_offset = msg->u_offset;
+}
+
+
+void batteryCallback(const sensor_msgs::BatteryState::ConstPtr& msg) {
+	_battery_state = *msg;
+
+	// TODO: currently the callback is configured to just save the data
+	//
+	// you can either make decisions based on the battery information here (e.g.
+	// change the state of the mission) or you can make those decisions in the
+	// while loop in the run() function
 }
 
 

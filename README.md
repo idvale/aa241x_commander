@@ -2,9 +2,10 @@
 
 This ROS package is a skeleton for the teams of Spring 2019's AA241x course.  The purpose of this package is mission handling / command and control of the drone through the Pixhawk 4.  This package has been created separately from the image handling nodes as the dependencies for the nodes related to the camera and imagine are quite different than the dependencies for the mission / command and control related nodes.  Furthermore, the separation allows teams to test the mission / command and control nodes on the desktops running Gazebo (i.e. not the Raspberry Pi 3B+) without any compilation problems that would occur due to the fact that the imaging handling nodes are very specific to the Raspberry Pi 3B+ hardware (i.e. the PiCam v2) and these nodes can be more generalized to any hardware interacting with the PX4 code and the world environment.
 
-This skeleton package currently contains the following node:
+This skeleton package currently contains the following nodes:
 
  - [`control_node`](#control-node): a skeleton node to help get you started with the command and control of the Pixhawk 4 onboard the drone through the [MavROS](http://wiki.ros.org/mavros) interface.  Currently the node executes a takeoff to a given altitude and once that altitude is reached, commands a landing using position commands.
+ - [`mission_node`](#mission-node): a skeleton node to help present a recommended structure for your mission logic.  [See below for details on the recommendations](#recommendations)
 
 
 This README is also a bit of a guide to help you get started and running the elements and is broken down as follows:
@@ -137,6 +138,31 @@ The control node subscribes to the following information:
      + `type_mask` - a bitfield that tells PX4 which fields to **ignore**.  For the most part the bitfield can be built using the constants defined in the topic type (the only notable exception is an altitude hold velocity control (specify Pz, Vx, Vy) which has a mask value of `2499`).
      + the data fields: `position`, `velocity`, `acceleration_or_force`, `yaw`, and `yaw_rate`.  These fields contain the respective information for the command to send to PX4.  **Note:** if you set data to the `velocity` fields, but the `type_mask` bitfield specifies to ignore the `velocity` fields, PX4 will ignore the fields, regardless of the data contained within the field.
 
+### Mission Node ###
+
+This node serves as a skeleton and example for how you might want to structure your code as your mission logic gets more complex ([see recommendations below](#recommendations)).
+
+#### Subscribes To ####
+
+The mission node subscribes to the following information:
+
+ - `mavros/state` - this topic, of type [`mavros_msgs::State`](http://docs.ros.org/melodic/api/mavros_msgs/html/msg/State.html), contains information on the state of the PX4 code.  The node uses 2 pieces of information from the state:
+     + `connected` - a boolean for whether or not the PX4 has completed the bootup process and has connected to the offboard computer (e.g. your Raspberry Pi 3B+).
+     + `mode` - a string stating the current control mode the PX4 is set to (e.g. "MANUAL" or "OFFBOARD")
+
+ - `/mavros/local_position/pose` - this topic, of type [`geometry_msgs::PoseStamped`](http://docs.ros.org/melodic/api/geometry_msgs/html/msg/PoseStamped.html), contains the local position (ENU) (defined with the origin as the take-off position of the drone) and the orientation of the drone computed by PX4.
+
+ - `/avros/battery` - this topic, of type [`sensor_msgs::BatteryState`](http://docs.ros.org/api/sensor_msgs/html/msg/BatteryState.html), constains the battery information (voltage, current draw, etc.) as measured by the Pixhawk.
+
+ - `measurement` - this topic, of type [`aa241x_mission::SensorMeasurement`](https://github.com/aa241x/aa241x_mission/blob/master/msg/SensorMeasurement.msg), contains the sensor information for the AA241x mission.  For more details on the sensor measurement, check out the [documentation for the `aa241x_mission` node](https://github.com/aa241x/aa241x_mission).
+
+ - `mission_state` - this topic, of type [`aa241x_mission::MissionState`](https://github.com/aa241x/aa241x_mission/blob/master/msg/MissionState.msg), contains general state information for the mission, and the offset needed to go from the ENU frame as computed by PX4 (with origin as the take-off position) to the Lake Lag ENU frame.  For more details on the Lake Lag frame and how to use the offset information, check out the [documentation for the `aa241x_mission` node](https://github.com/aa241x/aa241x_mission).
+
+**Note:** You will most likely find that you need to subscribe to additional information, so check out the [full MavROS documentation](http://wiki.ros.org/mavros) for additional topics that are published.  To help see what topics and data are publishes, check out [`rostopic`](http://wiki.ros.org/rostopic), which enables viewing the published topic names and data (among other things).
+
+#### Publishes ####
+
+Currently the node does not publish any data, however we recommend that this node should publish high level commands for your controller to act upon.
 
 ## Offboard Control ##
 
