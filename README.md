@@ -124,3 +124,29 @@ source devel/setup.bash
 roslaunch aa241x_mission mavros_pixhawk.launch
 ```
 
+
+## Recommendations ##
+
+**This section contains several recommendations to help you get started and navigating the task of designing an approach for handling the mission in a ROS environment.  These are only recommendations and you may find that you much prefer a different approach.  Please do not feel like you have to structure your code as we lay out here if something else makes more sense to you.**
+
+### Code Structure ###
+
+We recommend that you break down your handling of the overall mission into at least 2 different nodes:
+
+ - **mission logic** - A node that handles the high level logic that is associated with the mission.  Things that you might want to consider doing within the scope of this node are (a sekelton code for this node and these tasks can be found in `mission_node.cpp`):
+
+     + Keeping track of the current "mission phase" (e.g. have you taken off yet?  Are you in a search phase?  Moving back for a landing? - you can imagine that in each of these phase, you might want your system to behave differently)
+
+     + Keeping track of battery usage to make decisions on the current "mission phase" (e.g. should you sotp searching and go back to land?)
+
+     + "Looking" for people (i.e. subscribing to the `/measurement` topic) and running your estimation for their locations
+
+     + Adjusting your flight plan accordingly when people have been spotted (e.g. having the `mission_node` publish high level position commands to be used by your `control_node`)
+
+ - **control** - A node that handles the acutal control loops and publishing commands to the appropriate mavros topic to command the Pixhawk (e.g. `/mavros/setpoint_raw/local`).  As you integrate more mission phases into your system you may find it helpful for your `control_node` to subscribe to different topics that will send it high level information for where to go based on the mission phase, for example:
+
+     + Subscribe to high level position information published by your mission logic node that is to be used during the search phase of the mission
+
+     + Subscribe to information derived from your camera that is to be used during the landing phase of the mission
+
+
