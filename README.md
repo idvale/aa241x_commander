@@ -7,6 +7,13 @@ This skeleton package currently contains the following node:
  - [`control_node`](#control-node): a skeleton node to help get you started with the command and control of the Pixhawk 4 onboard the drone through the [MavROS](http://wiki.ros.org/mavros) interface.  Currently the node executes a takeoff to a given altitude and once that altitude is reached, commands a landing using position commands.
 
 
+This README is also a bit of a guide to help you get started and running the elements and is broken down as follows:
+
+ - [Getting Started](#getting-started) - help you get everything up and running 
+ - [Nodes](#nodes) - details on the nodes that exist within the skeleton code
+ - [Offboard Control](#offboard-control) - details on how to configure your Pixhawk for `OFFBOARD` control (the level flight mode required to give control to ROS)
+ - [Recommendations](#recommendations) - some recommendations and hints for how to structure your code as your mission elements get more complex.
+
 ## Getting Started ##
 
 The follow sections will help you get started with this ROS package.
@@ -33,6 +40,15 @@ catkin_make
 
 ### Running the Code ###
 
+You will be running your ROS code in 2 different environments:
+
+ - [In simulation](#in-simulation)
+ - [On your drone](#on-your-drone)
+
+Some of the commands for running your code in these two environments will be the same, so the first sub-section here addresses the general commands needed to get your code running and then more specifically how to run it in the different environment.
+
+#### Running Nodes in General ####
+
 Each of the nodes of this package can be run using the basic [`rosrun`](http://wiki.ros.org/rosbash#rosrun) framework or can be run using the example launch file using `roslaunch`.  For a tutorial on `roslaunch` check out either [this resource](http://www.clearpathrobotics.com/assets/guides/ros/Launch%20Files.html) or [this resource](http://wiki.ros.org/roslaunch#Tutorials).  The example launch file (`controller_only.launch`) will start the connection to the gazebo simulation (using the help of a launch file contained in [`aa241x_mission`](https://github.com/aa241x/aa241x_mission)) and the control node.
 
 To run using the launch file, you first need to make sure that you have the `aa241x_mission` package.  You will most likely not be modifying the `aa241x_mission` package, so feel free to just [clone the package](https://github.com/aa241x/aa241x_mission), but if you are interested in making your own modification, you can also fork the package.
@@ -47,11 +63,42 @@ roslaunch aa241x_commander controller_only.launch
 
 **Note:** for more details on the connection to the gazebo simulation using mavros, see the `aa241x_mission` [documentation](https://github.com/aa241x/aa241x_mission).
 
-#### Additional Launch File ####
+**Note:** You'll notice that if you run the above commands in a vacuum without anything else running on your machine you will most likely run into an error. This is because the `controller_only.launch` file is trying to connect to a pixhawk, and if one is not connected, it will fail.  See the two sections below (for running [i simulation](#in-simulation) and [on your drone](#on-your-drone)).
+
+##### Additional Launch File #####
 
 This skeleton node also contains a launch file to demonstrate the use of [`rosbag`](http://wiki.ros.org/rosbag) to be able to log data published to topics.  This is a very helpful tool to be able to log all the data and enable replaying data in ROS after a flight.
 
 **Note:** For the logging launch file to work, you will need to make sure to have the following directory `~/rosbags/` (if needed `mkdir ~/rosbags`) as that is where the logs will be saved.  More details on `rosbag` (logging, playback, etc), check out the [general documentation for the `aa241x_mission` node](https://github.com/aa241x/aa241x_mission).
+
+#### In Simulation ####
+
+To run your code with a simulated version of PX4 (what we call Software in the Loop), we have created a [detailed set of documentation](https://github.com/aa241x/scripts/blob/master/running-sitl.md) that will walk you through setting up an emulation of PX4 that your ROS environment will be able to connect to.
+
+
+#### On Your Drone ####
+
+On your drone (this means your code is running on the Raspberry Pi 3B+) you will have a physical connection to the Pixhawk through the USB-to-serial connector (see [offboard control below](#offboard-control) for details on how to make sure that connection is enabled).
+
+The steps are then as follows:
+
+ 1. Make sure your Raspberry Pi 3B+ is powered on
+
+ 2. Make sure your Pixhawk 4 is powered on
+
+ 3. Connect your ethernet cable from the Raspberry Pi to your computer (using the USB-to-ethernet adapter we configured in class)
+ 
+ 4. ssh into your Raspberry Pi (`ssh aa241x@192.168.1.41`)
+
+ 5. navigation to catkin_ws and launch ROS with your desired launch file:
+
+```sh
+cd ~/catkin_ws
+source devel/setup.bash
+nohup launch aa241x_commander <your-launch-file-name>
+```
+**Note:** We are working on make some helping scripts for you to streamline this process.
+
 
 ### Dependencies ###
 
