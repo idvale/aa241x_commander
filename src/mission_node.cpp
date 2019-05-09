@@ -152,7 +152,7 @@ void MissionNode::missionStateCallback(const aa241x_mission::MissionState::Const
 }
 
 
-void batteryCallback(const sensor_msgs::BatteryState::ConstPtr& msg) {
+void MissionNode::batteryCallback(const sensor_msgs::BatteryState::ConstPtr& msg) {
 	_battery_state = *msg;
 
 	// TODO: currently the callback is configured to just save the data
@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
 	// TODO: determine settings
 
 	// create the node
-	MissionNode node();
+	MissionNode node;
 
 	// run the node
 	return node.run();
