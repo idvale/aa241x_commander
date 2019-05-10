@@ -176,12 +176,12 @@ cd ~/scripts
 
 **I'm at the Lake and we forgot to pull our newest code!  Do I really have to walk back to Durand?**
 
-    Nope!  There are a couple ways that you can get your code up to date on your Raspberry Pi.  If you happen to have the most up to date code on your laptop, you can use FTP (e.g. with FileZilla) to simply move the files from your computer to the Raspberry Pi.  If you don't, the Elliot Program Center (building near the Lake) does have WiFi and you can get the code on your laptop over that connection.  If you have your Raspberry Pi registered on the network, you may find that you'll even be able to call `git pull` if you are close enough to the Elliot Program Center.
+ >Nope!  There are a couple ways that you can get your code up to date on your Raspberry Pi.  If you happen to have the most up to date code on your laptop, you can use FTP (e.g. with FileZilla) to simply move the files from your computer to the Raspberry Pi.  If you don't, the Elliot Program Center (building near the Lake) does have WiFi and you can get the code on your laptop over that connection.  If you have your Raspberry Pi registered on the network, you may find that you'll even be able to call `git pull` if you are close enough to the Elliot Program Center.
 
 
 **I don't like the startup script, can I do my own thing?**
 
-    The startup script is meant to help you with some of the oddities of working with Linux and companion computers.  If you are more comfortable with different ways to run background tasks, then please go ahead and do that.  Note however that simply running `roslaunch <package-name> <launch-file>` and then closing the terminal will not work as that is a foreground task that is immediately terminated when your connection to the Raspberry Pi is closed.
+ > The startup script is meant to help you with some of the oddities of working with Linux and companion computers.  If you are more comfortable with different ways to run background tasks, then please go ahead and do that.  Note however that simply running `roslaunch <package-name> <launch-file>` and then closing the terminal will not work as that is a foreground task that is immediately terminated when your connection to the Raspberry Pi is closed.
 
 
 ## Troubleshooting ##
