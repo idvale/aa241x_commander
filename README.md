@@ -79,7 +79,7 @@ To run your code with a simulated version of PX4 (what we call Software in the L
 
 #### On Your Drone ####
 
-**UNDER CONSTRUCTION - come back in a couple hours**
+[There is a whole guide for this with detailed steps to help you get in the air.](https://github.com/aa241x/aa241x_commander/blob/master/flying.md)
 
 
 ### Dependencies ###
