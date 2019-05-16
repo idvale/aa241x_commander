@@ -43,7 +43,7 @@ private:
 	ros::NodeHandle _nh;
 
 	// TODO: add any settings, etc, here
-	float _flight_alt = 20.0f;		// desired flight altitude [m] AGL (above takeoff)
+        float _flight_alt = 30.0f;		// desired flight altitude [m] AGL (above takeoff)
 
 	// data
 	mavros_msgs::State _current_state;
@@ -53,9 +53,9 @@ private:
 	// waypoint handling (example)
 	int _wp_index = -1;
 	int _n_waypoints = 1;
-	float _target_alt = 0.0f;
-	float _target_E=0.0f;
-	float _target_N=0.0f;
+        float _target_alt_lake = 0.0f;
+        float _target_E_lake=0.0f;
+        float _target_N_lake=0.0f;
 	float _target_v_E=0.0f;
 	float _target_v_N=0.0f;
 	float _target_yaw=0.0f; // Pointing east by default
@@ -68,10 +68,9 @@ private:
 	float _Kd_y=2.0f;
 
         // Maximum speed control for drone
-        float _u_speed_max=4.0f;
+        float _u_speed_max=7.0f;
 
-	// Line handling I give one point of the line and an heading. I was not able to make this work
-	// in the lake lagunita frame. I do everything in the local
+        // Line handling I give one point of the line and an heading. Coordinates in the lake lagunita frame!
 	float _line_E=50.0f;
 	float _line_N=-100.0f;
 	double _pi = 3.1415926535897;
@@ -159,7 +158,7 @@ _flight_alt(flight_alt)
 	_local_pos_sub = _nh.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &ControlNode::localPosCallback, this);
 	_local_speed_sub = _nh.subscribe<geometry_msgs::TwistStamped>("/mavros/local_position/velocity", 1, &ControlNode::localSpeedCallback, this);
 	_sensor_meas_sub =_nh.subscribe<aa241x_mission::SensorMeasurement>("measurement", 10, &ControlNode::sensorMeasCallback, this);
-        //_mission_state_sub=_nh.subscribe<aa241x_mission::MissionState>("mission_state", 10,&ControlNode::missionStateCallback, this);
+        _mission_state_sub=_nh.subscribe<aa241x_mission::MissionState>("mission_state", 10,&ControlNode::missionStateCallback, this);
 	// advertise the published detailed
 
 	// publish a PositionTarget to the `/mavros/setpoint_raw/local` topic which
@@ -182,20 +181,25 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 	// save the current local position locally to be used in the main loop
 	// TODO: account for offset to convert from PX4 coordinate to lake lag frame
 	_current_local_pos = *msg;
-    float _current_local_pos_E=_current_local_pos.pose.position.x;
-    float _current_local_pos_N=_current_local_pos.pose.position.y;
-    float _current_local_pos_U=_current_local_pos.pose.position.z;
+        float _current_local_pos_E=_current_local_pos.pose.position.x;
+        float _current_local_pos_N=_current_local_pos.pose.position.y;
+        float _current_local_pos_U=_current_local_pos.pose.position.z;
 
 	// TODO: make sure to account for the offset if desiring to fly in the Lake Lag frame
+        // I assume e,n, u offset are component of the vector drone to lake
+        float _current_local_pos_E_lake=_e_offset+_current_local_pos_E;
+        float _current_local_pos_N_lake=_n_offset+_current_local_pos_N;
+        float _current_local_pos_U_lake=_u_offset+_current_local_pos_U;
+
 
 	// check to see if have completed the waypoint
 
     // First waypoint to take off
 	if (_wp_index == 0) {
-		float current_alt = _current_local_pos.pose.position.z;
+
 
 		// check condition on being "close enough" to the waypoint
-		if (abs(current_alt - _target_alt) < 0.1) {
+                if (abs(_current_local_pos_U_lake - _target_alt_lake) < 0.1) {
 			// increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
 			_wp_index++;
 		}
@@ -207,28 +211,28 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 			float _a=tan(_line_heading);
 			float _b=_line_N-_line_E*_a;
 			// I then compute the crossing point
-			float _crossing_E=_current_local_pos_E-_a*(_b-_current_local_pos_N)/(1+pow(_a,2));
-			float _crossing_N=_a*_crossing_E+_b;
+                        float _crossing_E_lake=_current_local_pos_E_lake-_a*(_b-_current_local_pos_N_lake)/(1+pow(_a,2));
+                        float _crossing_N_lake=_a*_crossing_E_lake+_b;
 
 
 			// I find the heading
 			_target_yaw=-_pi/2+_line_heading;
-			if (_current_local_pos_N> _a*_current_local_pos_E) {
+                        if (_current_local_pos_N_lake> _a*_current_local_pos_E_lake) {
 				_target_yaw=_pi/2+_line_heading;
 			}
-			_target_E=_crossing_E;
-			_target_N=_crossing_N;
+                        _target_E_lake=_crossing_E_lake;
+                        _target_N_lake=_crossing_N_lake;
 			_wp_index++;
 		}
 
 	// Waypoint follow the line for 100 m
 	if (_wp_index == 2) {
-		if (abs(_current_local_pos_E - _target_E) < 0.1 && abs(_current_local_pos_N - _target_N) < 0.1) {
+                if (abs(_current_local_pos_E_lake - _target_E_lake) < 0.1 && abs(_current_local_pos_N_lake - _target_N_lake) < 0.1) {
 
-				float _on_line_E=_target_E-100*cos(_line_heading);
-				float _on_line_N=_target_N-100*sin(_line_heading);
-				_target_E=_on_line_E;
-				_target_N=_on_line_N;
+                                float _on_line_E=_target_E_lake-100*cos(_line_heading);
+                                float _on_line_N=_target_N_lake-100*sin(_line_heading);
+                                _target_E_lake=_on_line_E;
+                                _target_N_lake=_on_line_N;
 				_target_yaw=_line_heading-_pi;
 				_wp_index++;
 			}
@@ -236,11 +240,12 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 
 	// Waypoint come home
 		if (_wp_index == 3) {
-			if (abs(_current_local_pos_E - _target_E) < 0.1 && abs(_current_local_pos_N - _target_N) < 0.1) {
+                        if (abs(_current_local_pos_E_lake - _target_E_lake) < 0.1 && abs(_current_local_pos_N_lake - _target_N_lake) < 0.1) {
 
 
-					_target_E=0;
-					_target_N=0;
+                                        _target_E_lake=_current_local_pos_E_lake-_current_local_pos_E;
+                                        _target_N_lake=_current_local_pos_N_lake-_current_local_pos_N;
+                                        _target_alt_lake=_current_local_pos_U_lake-_current_local_pos_U;
 					_wp_index++;
 				}
 		}
@@ -260,7 +265,7 @@ void ControlNode::sensorMeasCallback(const aa241x_mission::SensorMeasurement::Co
 
 	// NOTE: this callback is for an example of how to setup a callback, you may
 	// want to move this information to a mission handling node
-}
+}//http://wiki.ros.org/roslaunch/XML
 
 void ControlNode::missionStateCallback(const aa241x_mission::MissionState::ConstPtr& msg) {
 	// save the offset information
@@ -293,16 +298,32 @@ int ControlNode::run() {
 	mavros_msgs::PositionTarget cmd;
 	cmd.coordinate_frame = mavros_msgs::PositionTarget::FRAME_LOCAL_NED;	// use the local frame
 
-	// configure the type mask to command only position information
-	// NOTE: type mask sets the fields to IGNORE
-	// TODO: need to add a link to the mask to explain the value
-	cmd.type_mask = (mavros_msgs::PositionTarget::IGNORE_VX |
-		mavros_msgs::PositionTarget::IGNORE_VY |
-		mavros_msgs::PositionTarget::IGNORE_VZ |
-		mavros_msgs::PositionTarget::IGNORE_AFX |
-		mavros_msgs::PositionTarget::IGNORE_AFY |
-		mavros_msgs::PositionTarget::IGNORE_AFZ |
-		mavros_msgs::PositionTarget::IGNORE_YAW_RATE);
+
+
+
+        // define the velocity control type mask
+        // NOTE: type mask sets the fields to IGNORE
+        uint16_t velocity_control_mask = (mavros_msgs::PositionTarget::IGNORE_PX |
+                mavros_msgs::PositionTarget::IGNORE_PY |
+                mavros_msgs::PositionTarget::IGNORE_PZ |
+                mavros_msgs::PositionTarget::IGNORE_AFX |
+                mavros_msgs::PositionTarget::IGNORE_AFY |
+                mavros_msgs::PositionTarget::IGNORE_AFZ |
+                mavros_msgs::PositionTarget::IGNORE_YAW_RATE);
+
+        // define the position control type mask
+        // NOTE: type mask sets the fields to IGNORE
+        uint16_t position_control_mask = (mavros_msgs::PositionTarget::IGNORE_VX |
+                mavros_msgs::PositionTarget::IGNORE_VY |
+                mavros_msgs::PositionTarget::IGNORE_VZ |
+                mavros_msgs::PositionTarget::IGNORE_AFX |
+                mavros_msgs::PositionTarget::IGNORE_AFY |
+                mavros_msgs::PositionTarget::IGNORE_AFZ |
+                mavros_msgs::PositionTarget::IGNORE_YAW_RATE);
+
+        // default to velocity control so 0 means don't move
+        cmd.type_mask = velocity_control_mask;
+
 
 	// cmd.type_mask = 2499;  // mask for Vx Vy and Pz control
 
@@ -340,15 +361,16 @@ int ControlNode::run() {
 			// send command to stay in the same position
 			// TODO: if doing position command in the lake lag frame, make
 			// sure these values match the initial position of the drone!
-			pos.x = 0;
-			pos.y = 0;
-			pos.z = 0;
+                        cmd.type_mask = velocity_control_mask;
+                        vel.x = 0;
+                        vel.y = 0;
+                        vel.z = 0;
 
-			// timestamp the message and send it
-			cmd.header.stamp = ros::Time::now();
-			cmd.position = pos;
-			cmd.velocity = vel;
-			_cmd_pub.publish(cmd);
+                    // timestamp the message and send it
+                        cmd.header.stamp = ros::Time::now();
+                        cmd.position = pos;
+                        cmd.velocity = vel;
+                        _cmd_pub.publish(cmd);
 
 			// run the ros components
 			ros::spinOnce();
@@ -367,8 +389,9 @@ int ControlNode::run() {
 
 		// set the first waypoint
 		if (_wp_index < 0) {
+
 			_wp_index = 0;
-			_target_alt = _flight_alt;
+                        _target_alt_lake = _flight_alt;
 		}
 
 		// TODO: populate the control elements desired
@@ -377,22 +400,26 @@ int ControlNode::run() {
 
 
 
-		pos.x = _target_E;
-		pos.y = _target_N;
-		pos.z = _target_alt;
+
 
                 float _current_local_pos_E=_current_local_pos.pose.position.x;
 		float _current_local_pos_N=_current_local_pos.pose.position.y;
 		float _current_local_pos_U=_current_local_pos.pose.position.z;
+
+                // Warning: we control everything in the local frame: need to define a control in the drone initial frame
+                pos.x = _target_E_lake-_e_offset;
+                pos.y = _target_N_lake-_n_offset;
+                pos.z = _target_alt_lake-_u_offset;
+                ROS_INFO("Print the different pos ");
 
 		float _current_local_speed_E=_current_local_speed.twist.linear.x;
 		float _current_local_speed_N=_current_local_speed.twist.linear.y;
 		float _current_local_speed_U=_current_local_speed.twist.linear.z;
 
 
-                // We compute the error in the x and y directions
-                float _epsilon_x=-_current_local_pos_E+_target_E;
-                float _epsilon_y=-_current_local_pos_N+_target_N;
+                // We compute the error in the x and y directions in the local frame (same as lake by the way)
+                float _epsilon_x=-_current_local_pos_E+pos.x;
+                float _epsilon_y=-_current_local_pos_N+pos.y;
 
 
                 float _epsilon_speed_x=_current_local_speed_E;
@@ -423,7 +450,7 @@ int ControlNode::run() {
 
                 //compute the desired yaw to always face the target position
                 _target_yaw=atan(_epsilon_y/_epsilon_x);
-                if (_current_local_pos_E>_target_E) {
+                if (_current_local_pos_E>pos.x) {
                     _target_yaw+=_pi;
                 }
 
@@ -472,7 +499,7 @@ int main(int argc, char **argv) {
 	// TODO: determine settings
 
 	// create the node
-	ControlNode node(10.0f);
+        ControlNode node(30.0f);
 
 	// run the node
 	return node.run();
