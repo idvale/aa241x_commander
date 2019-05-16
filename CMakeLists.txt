@@ -143,6 +143,7 @@ add_executable(control_node src/control_node.cpp)
 add_executable(PAUL_control_node src/PAUL_control_node.cpp)
 add_executable(PAUL_control_node_advanced src/PAUL_control_node_advanced.cpp)
 add_executable(line_position_control_node src/line_position_control_node.cpp)
+add_executable(control_node_with_offset src/control_node_with_offset.cpp)
 
 add_executable(mission_node src/mission_node.cpp)
 
@@ -170,6 +171,7 @@ target_link_libraries(control_node
 target_link_libraries(PAUL_control_node ${catkin_LIBRARIES})
 target_link_libraries(PAUL_control_node_advanced ${catkin_LIBRARIES})
 target_link_libraries(line_position_control_node ${catkin_LIBRARIES})
+target_link_libraries(control_node_with_offset ${catkin_LIBRARIES})
 
 target_link_libraries(mission_node
   ${catkin_LIBRARIES}
