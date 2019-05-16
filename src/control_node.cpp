@@ -190,16 +190,29 @@ int ControlNode::run() {
 	mavros_msgs::PositionTarget cmd;
 	cmd.coordinate_frame = mavros_msgs::PositionTarget::FRAME_LOCAL_NED;	// use the local frame
 
-	// configure the type mask to command only position information
+
+	// define the velocity control type mask
 	// NOTE: type mask sets the fields to IGNORE
-	// TODO: need to add a link to the mask to explain the value
-	cmd.type_mask = (mavros_msgs::PositionTarget::IGNORE_VX |
+	uint16_t velocity_control_mask = (mavros_msgs::PositionTarget::IGNORE_PX |
+		mavros_msgs::PositionTarget::IGNORE_PY |
+		mavros_msgs::PositionTarget::IGNORE_PZ |
+		mavros_msgs::PositionTarget::IGNORE_AFX |
+		mavros_msgs::PositionTarget::IGNORE_AFY |
+		mavros_msgs::PositionTarget::IGNORE_AFZ |
+		mavros_msgs::PositionTarget::IGNORE_YAW_RATE);
+
+	// define the position control type mask
+	// NOTE: type mask sets the fields to IGNORE
+	uint16_t position_control_mask = (mavros_msgs::PositionTarget::IGNORE_VX |
 		mavros_msgs::PositionTarget::IGNORE_VY |
 		mavros_msgs::PositionTarget::IGNORE_VZ |
 		mavros_msgs::PositionTarget::IGNORE_AFX |
 		mavros_msgs::PositionTarget::IGNORE_AFY |
 		mavros_msgs::PositionTarget::IGNORE_AFZ |
 		mavros_msgs::PositionTarget::IGNORE_YAW_RATE);
+
+	// default to velocity control so 0 means don't move
+	cmd.type_mask = velocity_control_mask;
 
 	// cmd.type_mask = 2499;  // mask for Vx Vy and Pz control
 
@@ -234,12 +247,11 @@ int ControlNode::run() {
 		// NOTE: need to be streaming setpoints in order for offboard to be
 		// allowed, hence the publishing of an empty command
 		if (_current_state.mode != "OFFBOARD") {
-			// send command to stay in the same position
-			// TODO: if doing position command in the lake lag frame, make
-			// sure these values match the initial position of the drone!
-			pos.x = 0;
-			pos.y = 0;
-			pos.z = 0;
+			// send command to stay in the same position (0 velocity)
+			cmd.type_mask = velocity_control_mask;
+			vel.x = 0;
+			vel.y = 0;
+			vel.z = 0;
 
 			// timestamp the message and send it
 			cmd.header.stamp = ros::Time::now();
@@ -272,6 +284,7 @@ int ControlNode::run() {
 		//
 		// in this case, just asking the pixhawk to takeoff to the _target_alt
 		// height
+		cmd.type_mask = position_control_mask;  // now can send position control commands
 		pos.x = 0;
 		pos.y = 0;
 		pos.z = _target_alt;
