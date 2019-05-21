@@ -79,26 +79,7 @@ To run your code with a simulated version of PX4 (what we call Software in the L
 
 #### On Your Drone ####
 
-On your drone (this means your code is running on the Raspberry Pi 3B+) you will have a physical connection to the Pixhawk through the USB-to-serial connector (see [offboard control below](#offboard-control) for details on how to make sure that connection is enabled).
-
-The steps are then as follows:
-
- 1. Make sure your Raspberry Pi 3B+ is powered on
-
- 2. Make sure your Pixhawk 4 is powered on
-
- 3. Connect your ethernet cable from the Raspberry Pi to your computer (using the USB-to-ethernet adapter we configured in class)
- 
- 4. ssh into your Raspberry Pi (`ssh aa241x@192.168.1.41`)
-
- 5. navigation to catkin_ws and launch ROS with your desired launch file:
-
-```sh
-cd ~/catkin_ws
-source devel/setup.bash
-nohup launch aa241x_commander <your-launch-file-name>
-```
-**Note:** We are working on make some helping scripts for you to streamline this process.
+[There is a whole guide for this with detailed steps to help you get in the air.](https://github.com/aa241x/aa241x_commander/blob/master/flying.md)
 
 
 ### Dependencies ###
