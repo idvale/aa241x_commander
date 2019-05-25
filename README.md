@@ -203,4 +203,9 @@ We recommend that you break down your handling of the overall mission into at le
 
      + Subscribe to information derived from your camera that is to be used during the landing phase of the mission
 
+### Extracting the data ###
+The launch file log_position.launch create a rosbag for each fly/simulation in /rosbags. Run the following bash command create a csv file for each topic: 
+for topic in `rostopic list -b bagfile.bag` ; do rostopic echo -p -b bagfile.bag $topic >bagfile-${topic//\//_}.csv ; done
+Then use Paul Planeix matlab file script_to_extract_control_from_csv and use Flight Review PX4 on the ulog file obtained on QGroundControl
+
 

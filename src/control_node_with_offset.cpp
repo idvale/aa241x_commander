@@ -71,8 +71,8 @@ private:
         float _u_speed_max=7.0f;
 
         // Line handling I give one point of the line and an heading. Coordinates in the lake lagunita frame!
-	float _line_E=50.0f;
-	float _line_N=-100.0f;
+        float _line_E=0.0f;
+        float _line_N=0.0f;
 	double _pi = 3.1415926535897;
 	float _line_heading=_pi/6;
 
@@ -410,7 +410,7 @@ int ControlNode::run() {
                 pos.x = _target_E_lake-_e_offset;
                 pos.y = _target_N_lake-_n_offset;
                 pos.z = _target_alt_lake-_u_offset;
-                ROS_INFO("Print the different pos ");
+
 
 		float _current_local_speed_E=_current_local_speed.twist.linear.x;
 		float _current_local_speed_N=_current_local_speed.twist.linear.y;

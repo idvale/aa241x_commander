@@ -11,6 +11,8 @@
 				/mavros/global_position/compass_hdg
 				/mavros/altitude
 				/mavros/time_reference
+				/mavros/setpoint_raw/local
+				measurement
 				/rosout" />
 
 </launch>
