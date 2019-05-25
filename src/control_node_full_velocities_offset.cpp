@@ -53,26 +53,29 @@ private:
 	// waypoint handling (example)
 	int _wp_index = -1;
 	int _n_waypoints = 1;
-        float _target_alt_lake = 20.0f; // This is the altitude desired w/r to lagunita frame
+        float _target_U_lake = 20.0f; // This is the altitude desired w/r to lagunita frame
         float _target_E_lake=0.0f;
         float _target_N_lake=0.0f;
 	float _target_v_E=0.0f;
 	float _target_v_N=0.0f;
+        float _target_v_U=0.0f;
 	float _target_yaw=0.0f; // Pointing east by default
 
 
         // Gains of the PD
-	float _Kp_x=2.0f;
-	float _Kp_y=3.0f;
-	float _Kd_x=2.0f;
-	float _Kd_y=2.0f;
+        float _Kp_x=0.5f;
+        float _Kp_y=0.5f;
+        float _Kp_z=0.5f;
+        float _Kd_x=0.5f;
+        float _Kd_y=0.5f;
+        float _Kd_z=0.5f;
 
         // Maximum speed control for drone
         float _u_speed_max=7.0f;
 
         // Line handling I give one point of the line and an heading. Coordinates in the lake lagunita frame!
-        float _line_E=0.0f;
-        float _line_N=0.0f;
+        float _line_E_lake=0.0f;
+        float _line_N_lake=0.0f;
 	double _pi = 3.1415926535897;
 	float _line_heading=_pi/6;
 
@@ -195,22 +198,26 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 	// check to see if have completed the waypoint
 
     // First waypoint to take off
-	if (_wp_index == 0) {
-                //_target_alt_lake=_u_offset+_flight_alt;
+        if (_wp_index == 0) {
+                //_target_U_lake=_u_offset+_flight_alt;
 
 		// check condition on being "close enough" to the waypoint
-                if (abs(_current_local_pos_U_lake - _target_alt_lake) < 0.1) {
+                if (abs(_current_local_pos_U_lake - _target_U_lake) < 0.1) {
                         //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
 			// increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
 			_wp_index++;
 		}
 	}
 
+
+
+
+
 	// "Waypoint" that is not truly a waypoint just a step to compute the desired point to go on the line
-	if (_wp_index == 1) {
+        if (_wp_index == 1) {
 			// I define the parameters of a line a direction and b offset
 			float _a=tan(_line_heading);
-			float _b=_line_N-_line_E*_a;
+                        float _b=_line_N_lake-_line_E_lake*_a;
 			// I then compute the crossing point
                         float _crossing_E_lake=_current_local_pos_E_lake-_a*(_b-_current_local_pos_N_lake)/(1+pow(_a,2));
                         float _crossing_N_lake=_a*_crossing_E_lake+_b;
@@ -227,26 +234,26 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 		}
 
 	// Waypoint follow the line for 100 m
-	if (_wp_index == 2) {
+        if (_wp_index == 2) {
                 if (abs(_current_local_pos_E_lake - _target_E_lake) < 0.1 && abs(_current_local_pos_N_lake - _target_N_lake) < 0.1) {
 
-                                float _on_line_E=_target_E_lake-100*cos(_line_heading);
-                                float _on_line_N=_target_N_lake-100*sin(_line_heading);
-                                _target_E_lake=_on_line_E;
-                                _target_N_lake=_on_line_N;
+                                float _on_line_E_lake=_target_E_lake-100*cos(_line_heading);
+                                float _on_line_N_lake=_target_N_lake-100*sin(_line_heading);
+                                _target_E_lake=_on_line_E_lake;
+                                _target_N_lake=_on_line_N_lake;
 				_target_yaw=_line_heading-_pi;
 				_wp_index++;
 			}
 	}
 
 	// Waypoint come home
-		if (_wp_index == 3) {
+                if (_wp_index == 3) {
                         if (abs(_current_local_pos_E_lake - _target_E_lake) < 0.1 && abs(_current_local_pos_N_lake - _target_N_lake) < 0.1) {
 
 
                                         _target_E_lake=_current_local_pos_E_lake-_current_local_pos_E;
                                         _target_N_lake=_current_local_pos_N_lake-_current_local_pos_N;
-                                        _target_alt_lake=_current_local_pos_U_lake-_current_local_pos_U;
+                                        _target_U_lake=_current_local_pos_U_lake-_current_local_pos_U;
 					_wp_index++;
 				}
 		}
@@ -388,11 +395,11 @@ int ControlNode::run() {
 		// at this point the pixhawk is in offboard control, so we can now fly
 		// the drone as desired
 
-		// set the first waypoint
+                // set the first waypoint, we want a takeoff at _flight_alt in local frame
 		if (_wp_index < 0) {
 
 			_wp_index = 0;
-                        _target_alt_lake =_u_offset+ _flight_alt;
+                        _target_U_lake =_u_offset+ _flight_alt;
                         _target_E_lake= _current_local_pos.pose.position.x+_e_offset;
                         _target_N_lake=  _current_local_pos.pose.position.y+_n_offset;
 		}
@@ -412,7 +419,7 @@ int ControlNode::run() {
                 // Warning: we control everything in the local frame: need to define a control in the drone initial frame
                 pos.x = _target_E_lake-_e_offset;
                 pos.y = _target_N_lake-_n_offset;
-                pos.z = _target_alt_lake-_u_offset;
+                pos.z = _target_U_lake-_u_offset;
 
 
 		float _current_local_speed_E=_current_local_speed.twist.linear.x;
@@ -423,6 +430,7 @@ int ControlNode::run() {
                 // We compute the error in the x and y directions in the local frame (same as lake by the way)
                 float _epsilon_x=-_current_local_pos_E+pos.x;
                 float _epsilon_y=-_current_local_pos_N+pos.y;
+                float _epsilon_z=-_current_local_pos_U+pos.z;
 
 
                 float _epsilon_speed_x=_current_local_speed_E;
@@ -446,6 +454,17 @@ int ControlNode::run() {
                     _epsilon_speed_y=-_current_local_speed_N;
                 }
 
+                float _epsilon_speed_z=_current_local_speed_U;
+                if(_epsilon_z>0 && _current_local_speed_U>0) {
+                    _epsilon_speed_z=_current_local_speed_U;
+                } else if(_epsilon_z>0 && _current_local_speed_U<0) {
+                    _epsilon_speed_z=-_current_local_speed_U;
+                } else if(_epsilon_z<0 && _current_local_speed_U<0) {
+                    _epsilon_speed_z=_current_local_speed_U;
+                } else {
+                    _epsilon_speed_z=-_current_local_speed_U;
+                }
+
                 //float _current_slope=_epsilon_y/_epsilon_x;
 
                 //float _projected_speed=(_current_local_speed_E+_a*_current_local_speed_N)/sqrt(1+pow(_current_slope,2));
@@ -459,6 +478,8 @@ int ControlNode::run() {
 
                 vel.x=_Kp_x*_epsilon_x + _Kd_x*_epsilon_speed_x;
                 vel.y=_Kp_y*_epsilon_y + _Kd_y*_epsilon_speed_y;
+                vel.z=_Kp_z*_epsilon_z + _Kd_z*_epsilon_speed_z;
+
 
                 if(abs(pow(vel.x,2)+pow(vel.y,2))>_u_speed_max) {
                     vel.x=_u_speed_max*cos(_target_yaw);
@@ -477,7 +498,7 @@ int ControlNode::run() {
 
 		cmd.yaw=_target_yaw;
 
-		cmd.type_mask = 2499;
+                cmd.type_mask =velocity_control_mask;
 
 		// publish the command
 		cmd.header.stamp = ros::Time::now();
