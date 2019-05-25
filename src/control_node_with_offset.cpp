@@ -61,7 +61,7 @@ private:
 	float _target_yaw=0.0f; // Pointing east by default
 
 
-        // Gains of the PID
+        // Gains of the PD
 	float _Kp_x=2.0f;
 	float _Kp_y=3.0f;
 	float _Kd_x=2.0f;
