@@ -537,7 +537,7 @@ int ControlNode::run() {
                 if (_wp_index ==6) {
                     vel.z=0;
                     vel.x=0;
-                    vel.z=0;
+                    vel.y=0;
                 }
 
 
