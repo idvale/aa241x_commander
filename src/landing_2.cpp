@@ -4,8 +4,11 @@
 
 // includes
 #include <math.h>
-
+#include <iterator>
+#include <random>
+#include <iostream>
 #include <ros/ros.h>
+using namespace std;
 
 // topic data
 #include <geometry_msgs/PoseStamped.h>
@@ -63,15 +66,16 @@ private:
 
 
         // Gains of the PD
-        float _Kp_x=0.5f;
-        float _Kp_y=0.5f;
-        float _Kp_z=0.5f;
-        float _Kd_x=0.5f;
-        float _Kd_y=0.5f;
-        float _Kd_z=0.5f;
+        float _Kp_x=0.1f;
+        float _Kp_y=0.1f;
+        float _Kp_z=0.1f;
+        float _Kd_x=0.1f;
+        float _Kd_y=0.1f;
+        float _Kd_z=0.1f;
 
         // Maximum speed control for drone
         float _u_speed_max=7.0f;
+        float _v_z_speed_max=3.0f;
 
         // Line handling I give one point of the line and an heading. Coordinates in the lake lagunita frame!
         float _line_E_lake=0.0f;
@@ -79,6 +83,12 @@ private:
 	double _pi = 3.1415926535897;
 	float _line_heading=_pi/6;
 
+
+
+        // Defining a fake camera lx,ly,lz represents the vector drone to landing site
+        float lx=0.0f; // true east
+        float ly=0.0f; // true north
+        float lz=0.0f; //true up altidude
 
 
 
@@ -187,6 +197,14 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
         float _current_local_pos_E=_current_local_pos.pose.position.x;
         float _current_local_pos_N=_current_local_pos.pose.position.y;
         float _current_local_pos_U=_current_local_pos.pose.position.z;
+        // Define random generator with Gaussian distribution to mimick uncertainty with camera data
+        const double mean = 0.0;
+        const double stddev = 0.01;
+        std::default_random_engine generator;
+        std::normal_distribution<double> dist(mean,stddev);
+        lx=-_current_local_pos_E+dist(generator);
+        ly=-_current_local_pos_N+dist(generator);
+        lz=-_current_local_pos_U+dist(generator);
 
 	// TODO: make sure to account for the offset if desiring to fly in the Lake Lag frame
         // I assume e,n, u offset are component of the vector drone to lake
@@ -202,73 +220,48 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
                 //_target_U_lake=_u_offset+_flight_alt;
 
 		// check condition on being "close enough" to the waypoint
-
+                if ((abs(_current_local_pos_U_lake - _target_U_lake) < 0.5) && (abs(_current_local_pos_N_lake - _target_N_lake)< 0.5) && (abs(_current_local_pos_E_lake - _target_E_lake)< 0.5) ) {
                         //ROS_INFO("PASSE AU MODE 1");
                         //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
 			// increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
-                _wp_index++;
-                _target_E_lake=_current_local_pos_E_lake-50;
-                _target_N_lake=_current_local_pos_N;
-
+			_wp_index++;
+                        _target_E_lake=_e_offset;
+                        _target_N_lake=_n_offset;
+                        _target_U_lake=_u_offset+30;
+		}
         }
 
         if (_wp_index == 1) {
                 //_target_U_lake=_u_offset+_flight_alt;
 
                 // check condition on being "close enough" to the waypoint
-                if (abs(_current_local_pos_E_lake - _target_E_lake) < 0.5) {
-                        //ROS_INFO("PASSE AU MODE 2");
+                if ((abs(_current_local_pos_U_lake - _target_U_lake) < 0.5) && (abs(_current_local_pos_N_lake - _target_N_lake)< 0.5) && (abs(_current_local_pos_E_lake - _target_E_lake)< 0.5) ) {
+                        //ROS_INFO("PASSE AU MODE 1");
                         //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
                         // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
                         _wp_index++;
-                        _target_E_lake=_current_local_pos_E_lake;
-                        _target_N_lake=_current_local_pos_N_lake-50;
+                        _target_E_lake=_current_local_pos_E_lake+lx;
+                        _target_N_lake=_current_local_pos_N_lake+ly;
+                        _target_U_lake=_current_local_pos_U_lake+lz;
                 }
         }
-
         if (_wp_index == 2) {
                 //_target_U_lake=_u_offset+_flight_alt;
 
                 // check condition on being "close enough" to the waypoint
-                if (abs(_current_local_pos_N_lake - _target_N_lake) < 0.5) {
-                        //ROS_INFO("PASSE AU MODE 3");
+                if (abs(lz)<0.1) {
+                        //ROS_INFO("PASSE AU MODE 1");
                         //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
                         // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
                         _wp_index++;
-                        _target_E_lake=_current_local_pos_E_lake+50;
-                        _target_N_lake=_current_local_pos_N_lake;
+                        _target_E_lake=_current_local_pos_E_lake+lx;
+                        _target_N_lake=_current_local_pos_N_lake+ly;
+                        _target_U_lake=_current_local_pos_U_lake+lz;
                 }
         }
 
-        if (_wp_index == 3) {
-                //_target_U_lake=_u_offset+_flight_alt;
-                ROS_INFO("target_E_lake:%f",_target_E_lake);
-                ROS_INFO("_current_local_pos_E_lake:%f",_current_local_pos_E_lake);
-                // check condition on being "close enough" to the waypoint
-                if (abs(_current_local_pos_E_lake - _target_E_lake) < 0.5) {
-                        //ROS_INFO("PASSE AU MODE 4");
-                        //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
-                        // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
-                        _wp_index++;
-                        _target_E_lake=_current_local_pos_E_lake;
-                        _target_N_lake=_current_local_pos_N_lake+50;
-                }
-        }
 
-        if (_wp_index == 4) {
-                //_target_U_lake=_u_offset+_flight_alt;
 
-                // check condition on being "close enough" to the waypoint
-                if (abs(_current_local_pos_N_lake - _target_N_lake)<0.5) {
-                        //ROS_INFO("PASSE AU MODE 5");
-                        //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
-                        // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
-                        _wp_index++;
-                        _target_E_lake=_current_local_pos_E_lake;
-                        _target_N_lake=_current_local_pos_N_lake;
-
-                }
-        }
 
 
 }
@@ -405,10 +398,15 @@ int ControlNode::run() {
 		if (_wp_index < 0) {
 
 			_wp_index = 0;
-                        _target_N_lake=_current_local_pos.pose.position.y+_n_offset;
-                        _target_E_lake=_current_local_pos.pose.position.x+_e_offset;
-                        _target_U_lake=_current_local_pos.pose.position.z+_u_offset;
-
+                        _target_N_lake=_current_local_pos.pose.position.y+_n_offset-10;
+                        _target_E_lake=_current_local_pos.pose.position.x+_e_offset-10;
+                        _target_U_lake=_current_local_pos.pose.position.z+_u_offset+40;
+                        _Kp_x=0.5f;
+                        _Kp_y=0.5f;
+                        _Kp_z=0.5f;
+                        _Kd_x=0.5f;
+                        _Kd_y=0.5f;
+                        _Kd_z=0.5f;
 		}
 
 		// TODO: populate the control elements desired
@@ -417,11 +415,26 @@ int ControlNode::run() {
 
 
 
-
-
                 float _current_local_pos_E=_current_local_pos.pose.position.x;
 		float _current_local_pos_N=_current_local_pos.pose.position.y;
 		float _current_local_pos_U=_current_local_pos.pose.position.z;
+
+                if(_wp_index==2) {
+                    _Kp_x=0.1f;
+                    _Kp_y=0.1f;
+                    _Kp_z=0.1f;
+                    _Kd_x=0.1f;
+                    _Kd_y=0.1f;
+                    _Kd_z=0.1f;
+                    float _current_local_pos_E_lake=_e_offset+_current_local_pos_E;
+                    float _current_local_pos_N_lake=_n_offset+_current_local_pos_N;
+                    float _current_local_pos_U_lake=_u_offset+_current_local_pos_U;
+                    _target_E_lake=_current_local_pos_E_lake+lx;
+                    _target_N_lake=_current_local_pos_N_lake+ly;
+                    _target_U_lake=_current_local_pos_U_lake+lz;
+                }
+
+
 
                 // Warning: we control everything in the local frame: need to define a control in the drone initial frame
                 pos.x = _target_E_lake-_e_offset;
@@ -493,43 +506,30 @@ int ControlNode::run() {
                     vel.y=_u_speed_max*sin(_target_yaw);
                 }
 
-                // If we take off, we set to 0 the lateral velocities
+                if(abs(vel.z)>_v_z_speed_max) {
+                    vel.z=vel.z/abs(vel.z)*_v_z_speed_max;
+                }
+
+
+
+
                 if (_wp_index ==0) {
-                    vel.x=0;
-                    vel.y=0;
-                    vel.z=0;
                     _target_yaw=_pi;
                 }
+
                 if (_wp_index ==1) {
-                    vel.z=0;
-                    vel.y=0;
-                    vel.x=-2.0f;
                     _target_yaw=_pi;
                 }
-                if (_wp_index ==2) {
-                    vel.z=0;
-                    vel.y=-5.0f;
-                    vel.x=0.0f;
+                if(_wp_index==2) {
                     _target_yaw=_pi;
                 }
-                if (_wp_index ==3) {
-                    vel.z=0;
-                    vel.y=0;
-                    vel.x=+8.0f;
-                    _target_yaw=_pi;
-                }
-                if (_wp_index ==4) {
-                    vel.z=0;
-                    vel.y=+12.0f;
-                    vel.x=0;
-                    _target_yaw=_pi;
-                }
-                if (_wp_index ==5) {
-                    vel.z=0;
+                if(_wp_index==3) {
                     vel.x=0;
                     vel.y=0;
-                    _target_yaw=_pi;
+                    vel.z=0;
                 }
+
+
 
 
 
