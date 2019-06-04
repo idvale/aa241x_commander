@@ -1,0 +1,32 @@
+<launch>
+	<!-- this launch file will start the controller node (and mavros since this is also needed) -->
+	<!-- will start the following: -->
+	<!-- 	mavros -->
+	<!--	control node -->
+	<!-- 	appropriate ros bags -->
+
+	<!-- give the argument for which control node to choose -->
+	<arg name="name_control_node" /> 
+	<!-- read value of arg -->
+ 	<param name="param" value="$(arg name_control_node)"/>
+	
+
+	<!-- mavros to the pixhawk -->
+	<include file="$(find aa241x_mission)/launch/mavros_gazebo.launch" >
+		<!-- TODO: decide if this should be local or the one for the laptop -->
+	</include>
+
+
+	<!-- AA241x elements to the mission (the people, the scoring, all the fun stuff) -->
+	<include file="$(find aa241x_mission)/launch/aa241x_mission.launch" >
+		<arg name="mission_index" value="$(arg mission_index)" />
+	</include>
+
+	<!-- the control node -->
+	<node pkg="aa241x_commander" type="$(arg name_control_node)" name="$(arg name_control_node)" output="screen">
+    </node>
+
+	<!-- logging -->
+	<include file="$(find aa241x_commander)/launch/log_position.launch" />
+
+</launch>

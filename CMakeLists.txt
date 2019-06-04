@@ -139,7 +139,22 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/aa241x_commander_node.cpp)
 add_executable(control_node src/control_node.cpp)
+
+add_executable(PAUL_control_node src/PAUL_control_node.cpp)
+add_executable(PAUL_control_node_advanced src/PAUL_control_node_advanced.cpp)
+add_executable(line_position_control_node src/line_position_control_node.cpp)
+add_executable(control_node_with_offset src/control_node_with_offset.cpp)
+add_executable(control_node_full_velocities_offset src/control_node_full_velocities_offset.cpp)
+add_executable(Flight_test_1 src/Flight_test_1.cpp)
+add_executable(take_off_1 src/take_off_1.cpp)
+add_executable(take_off_2 src/take_off_2.cpp)
+add_executable(take_off_3 src/take_off_3.cpp)
+add_executable(landing_1 src/landing_1.cpp)
+add_executable(landing_2 src/landing_2.cpp)
+add_executable(Speed_analysis src/Speed_analysis.cpp)
+
 add_executable(mission_node src/mission_node.cpp)
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -161,6 +176,18 @@ add_dependencies(mission_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPOR
 target_link_libraries(control_node
   ${catkin_LIBRARIES}
 )
+target_link_libraries(PAUL_control_node ${catkin_LIBRARIES})
+target_link_libraries(PAUL_control_node_advanced ${catkin_LIBRARIES})
+target_link_libraries(line_position_control_node ${catkin_LIBRARIES})
+target_link_libraries(control_node_with_offset ${catkin_LIBRARIES})
+target_link_libraries(control_node_full_velocities_offset ${catkin_LIBRARIES})
+target_link_libraries(Flight_test_1 ${catkin_LIBRARIES})
+target_link_libraries(take_off_1 ${catkin_LIBRARIES})
+target_link_libraries(take_off_2 ${catkin_LIBRARIES})
+target_link_libraries(take_off_3 ${catkin_LIBRARIES})
+target_link_libraries(landing_1 ${catkin_LIBRARIES})
+target_link_libraries(landing_2 ${catkin_LIBRARIES})
+target_link_libraries(Speed_analysis ${catkin_LIBRARIES})
 
 target_link_libraries(mission_node
   ${catkin_LIBRARIES}
