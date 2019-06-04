@@ -194,7 +194,7 @@ void ControlNode::localSpeedCallback(const geometry_msgs::TwistStamped::ConstPtr
 
 void  ControlNode::landingPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
     _landing_Pos = *msg;
-    //////////////////////////////@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@/////////////////////////////////////
+
     lx=_landing_Pos.pose.position.x;
     std::cout<<"lx in landingPoseCallback: "<<lx<<endl;
     ly=_landing_Pos.pose.position.y;
