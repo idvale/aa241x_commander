@@ -175,7 +175,7 @@ _flight_alt(flight_alt)
 	_sensor_meas_sub =_nh.subscribe<aa241x_mission::SensorMeasurement>("measurement", 10, &ControlNode::sensorMeasCallback, this);
         _mission_state_sub=_nh.subscribe<aa241x_mission::MissionState>("mission_state", 10,&ControlNode::missionStateCallback, this);
 	// advertise the published detailed
- _landing_pose_sub =  _nh.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &ControlNode::landingPoseCallback, this);
+ _landing_pose_sub =  _nh.subscribe<geometry_msgs::PoseStamped>("landing_pose", 1, &ControlNode::landingPoseCallback, this);
 	// publish a PositionTarget to the `/mavros/setpoint_raw/local` topic which
 	// mavros subscribes to in order to send commands to the pixhawk
 	_cmd_pub = _nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 1);
@@ -196,9 +196,10 @@ void  ControlNode::landingPoseCallback(const geometry_msgs::PoseStamped::ConstPt
     _landing_Pos = *msg;
     //////////////////////////////@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@/////////////////////////////////////
     lx=_landing_Pos.pose.position.x;
+    std::cout<<"lx in landingPoseCallback: "<<lx<<endl;
     ly=_landing_Pos.pose.position.y;
     lz=_landing_Pos.pose.position.z;
-//    std::cout << "distance:" << lz //test tmr;
+    //std::cout << "distance:" << lz //test tmr
 }
 
 
@@ -233,13 +234,14 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 
 		// check condition on being "close enough" to the waypoint
                 if ((abs(_current_local_pos_U_lake - _target_U_lake) < 0.5) && (abs(_current_local_pos_N_lake - _target_N_lake)< 0.5) && (abs(_current_local_pos_E_lake - _target_E_lake)< 0.5) ) {
+                    //std::cout<<"lx: "<<lx<<endl;
                         //ROS_INFO("PASSE AU MODE 1");
                         //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
 			// increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
 			_wp_index++;
                         _target_E_lake=_e_offset;
                         _target_N_lake=_n_offset;
-                        _target_U_lake=_u_offset+30;
+                        _target_U_lake=_u_offset+2.5;
 		}
         }
 
@@ -247,28 +249,26 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
                 //_target_U_lake=_u_offset+_flight_alt;
 
                 // check condition on being "close enough" to the waypoint
-                if ((abs(_current_local_pos_U_lake - _target_U_lake) < 0.5) && (abs(_current_local_pos_N_lake - _target_N_lake)< 0.5) && (abs(_current_local_pos_E_lake - _target_E_lake)< 0.5) ) {
-                        //ROS_INFO("PASSE AU MODE 1");
+                if ((abs(_current_local_pos_U_lake - _target_U_lake) < 0.5) && (abs(_current_local_pos_N_lake - _target_N_lake)< 0.5) && (abs(_current_local_pos_E_lake - _target_E_lake)< 0.5) && (lx!=0 || ly!=0 || lz!=0)) {
+                        ROS_INFO("Goes to mode 2");
                         //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
                         // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
                         _wp_index++;
                         _target_E_lake=_current_local_pos_E_lake+lx;
-                        _target_N_lake=_current_local_pos_N_lake+ly;
-                        _target_U_lake=_current_local_pos_U_lake+lz;
+                        _target_N_lake=_current_local_pos_N_lake-ly;
+                        _target_U_lake=_current_local_pos_U_lake-lz;
                 }
         }
         if (_wp_index == 2) {
                 //_target_U_lake=_u_offset+_flight_alt;
 
                 // check condition on being "close enough" to the waypoint
-                if (abs(lz)<0.1) {
+                if (abs(lz)<0.3) {
                         //ROS_INFO("PASSE AU MODE 1");
                         //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
                         // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
                         _wp_index++;
-                        _target_E_lake=_current_local_pos_E_lake+lx;
-                        _target_N_lake=_current_local_pos_N_lake+ly;
-                        _target_U_lake=_current_local_pos_U_lake+lz;
+
                 }
         }
 
@@ -410,9 +410,10 @@ int ControlNode::run() {
 		if (_wp_index < 0) {
 
 			_wp_index = 0;
-                        _target_N_lake=_current_local_pos.pose.position.y+_n_offset-10;
-                        _target_E_lake=_current_local_pos.pose.position.x+_e_offset-10;
-                        _target_U_lake=_current_local_pos.pose.position.z+_u_offset+40;
+
+                        _target_E_lake=_e_offset;
+                        _target_N_lake=_n_offset;
+                        _target_U_lake=_u_offset+20;
                         _Kp_x=0.5f;
                         _Kp_y=0.5f;
                         _Kp_z=0.5f;
@@ -431,20 +432,34 @@ int ControlNode::run() {
 		float _current_local_pos_N=_current_local_pos.pose.position.y;
 		float _current_local_pos_U=_current_local_pos.pose.position.z;
 
-                if(_wp_index==2) {
+                if (_wp_index ==1) {
                     _Kp_x=0.1f;
                     _Kp_y=0.1f;
                     _Kp_z=0.1f;
                     _Kd_x=0.1f;
                     _Kd_y=0.1f;
                     _Kd_z=0.1f;
-                    float _current_local_pos_E_lake=_e_offset+_current_local_pos_E;
-                    float _current_local_pos_N_lake=_n_offset+_current_local_pos_N;
-                    float _current_local_pos_U_lake=_u_offset+_current_local_pos_U;
-                    _target_E_lake=_current_local_pos_E_lake+lx;
-                    _target_N_lake=_current_local_pos_N_lake+ly;
-                    _target_U_lake=_current_local_pos_U_lake+lz;
+                    //std::cout<<"lx in wp_index1: "<<lx<<endl;
                 }
+
+
+
+                if(_wp_index==2) {
+                 _Kp_x=0.1f;
+                 _Kp_y=0.1f;
+                 _Kp_z=0.1f;
+                 _Kd_x=0.1f;
+                 _Kd_y=0.1f;
+                 _Kd_z=0.1f;
+                 float _current_local_pos_E_lake=_e_offset+_current_local_pos_E;
+                 float _current_local_pos_N_lake=_n_offset+_current_local_pos_N;
+                 float _current_local_pos_U_lake=_u_offset+_current_local_pos_U;
+                 _target_E_lake=_current_local_pos_E_lake+lx;
+                 _target_N_lake=_current_local_pos_N_lake-ly;
+                 _target_U_lake=_current_local_pos_U_lake-lz;
+                }
+
+
 
 
 
@@ -524,22 +539,24 @@ int ControlNode::run() {
 
 
 
+                if(_wp_index==3) {
+                    vel.z=-0.01;
+                    vel.x=0;
+                    vel.y=0;
+                }
+
 
                 if (_wp_index ==0) {
-                    _target_yaw=_pi;
+                    _target_yaw=_pi/2;
                 }
 
                 if (_wp_index ==1) {
-                    _target_yaw=_pi;
+                    _target_yaw=_pi/2;
                 }
                 if(_wp_index==2) {
-                    _target_yaw=_pi;
+                    _target_yaw=_pi/2;
                 }
-                if(_wp_index==3) {
-                    vel.x=0;
-                    vel.y=0;
-                    vel.z=0;
-                }
+
 
 
 
