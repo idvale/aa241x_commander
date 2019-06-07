@@ -152,6 +152,7 @@ add_executable(take_off_3 src/take_off_3.cpp)
 add_executable(landing_1 src/landing_1.cpp)
 add_executable(landing_2 src/landing_2.cpp)
 add_executable(landing_3 src/landing_3.cpp)
+add_executable(landing_4 src/landing_4.cpp)
 add_executable(Speed_analysis src/Speed_analysis.cpp)
 
 add_executable(mission_node src/mission_node.cpp)
@@ -189,6 +190,7 @@ target_link_libraries(take_off_3 ${catkin_LIBRARIES})
 target_link_libraries(landing_1 ${catkin_LIBRARIES})
 target_link_libraries(landing_2 ${catkin_LIBRARIES})
 target_link_libraries(landing_3 ${catkin_LIBRARIES})
+target_link_libraries(landing_4 ${catkin_LIBRARIES})
 target_link_libraries(Speed_analysis ${catkin_LIBRARIES})
 
 target_link_libraries(mission_node

@@ -17,7 +17,6 @@
 
 #include <aa241x_mission/SensorMeasurement.h>
 #include <aa241x_mission/MissionState.h>
-#include <aa241x_mission/RequestLandingPosition.h>
 
 /**
  * class to contain the functionality of the mission node.
@@ -53,10 +52,6 @@ private:
 	float _n_offset = 0.0f;
 	float _u_offset = 0.0f;
 
-	// landing position
-	float _landing_e = 0.0f;
-	float _landing_n = 0.0f;
-
 	// subscribers
 	ros::Subscriber _state_sub;			// the current state of the pixhawk
 	ros::Subscriber _local_pos_sub;		// local position information
@@ -64,9 +59,6 @@ private:
 	ros::Subscriber _mission_state_sub; // mission state
 	ros::Subscriber _battery_sub;		// the current battery information
 	// TODO: add subscribers here
-
-	//service
-	ros::ServiceClient _landing_loc_client;
 
 	// publishers
 
@@ -124,9 +116,6 @@ MissionNode::MissionNode() {
 	_sensor_meas_sub =_nh.subscribe<aa241x_mission::SensorMeasurement>("measurement", 10, &MissionNode::sensorMeasCallback, this);
 	_battery_sub =_nh.subscribe<sensor_msgs::BatteryState>("mavros/battery", 10, &MissionNode::batteryCallback, this);
 
-	// service
-	_landing_loc_client = _nh.serviceClient<aa241x_mission::RequestLandingPosition>("lake_lag_landing_loc");
-
 	// advertise the published detailed
 }
 
@@ -175,17 +164,6 @@ void MissionNode::batteryCallback(const sensor_msgs::BatteryState::ConstPtr& msg
 
 
 int MissionNode::run() {
-
-	// get the landing position
-     aa241x_mission::RequestLandingPosition srv;
-     if (_landing_loc_client.call(srv)) {
-          // NOTE: saving the landing East and North coordinates to class member variables
-          _landing_e = srv.response.east;
-          _landing_n = srv.response.north;
-          ROS_INFO("landing coordinate: (%0.2f, %0.2f)", _landing_n, _landing_e);
-     } else {
-          ROS_ERROR("unable to get landing location in Lake Lag frame!");
-     }
 
 	// set the loop rate in [Hz]
 	ros::Rate rate(10.0);

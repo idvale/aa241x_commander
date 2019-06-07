@@ -11,7 +11,6 @@
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/PositionTarget.h>
 
-#include <aa241x_mission/PersonEstimate.h>
 #include <aa241x_mission/SensorMeasurement.h>
 #include <aa241x_mission/MissionState.h>
 using namespace std;
@@ -48,26 +47,14 @@ private:
         // data
         mavros_msgs::State _current_state;
         geometry_msgs::PoseStamped _current_local_pos;
-                geometry_msgs::PoseStamped _landing_Pos;
+geometry_msgs::PoseStamped _landing_Pos;
 
         // waypoint handling (example)
-                std::vector<int> ID;
-                std::vector<int> ID2detect;
-                std::vector<int> IDdetected;
-                std::vector<float> xB2detect;
-                std::vector<float> yB2detect;
-                std::vector<float> xBFinal;
-                std::vector<float> yBFinal;
-                std::vector<float> xBcount;
-                std::vector<float> yBcount;
-        std::vector<float> p_y;
-        std::vector<float> p_x;
-
         int _wp_index = 0;
         int _n_waypoints = 1;
         float _target_alt = 0.0f;
-        float _target_Vd = 4.0f;
-        float _target_V = 4.0f;
+        float _target_Vd = 0.0f;
+        float _target_V = 0.0f;
         float _target_Vin = 0.0f;
         float _target_x = 0.0f;
         float _target_y = 0.0f;
@@ -81,7 +68,7 @@ private:
         float y0off = 0.0f;
         float z0off = 0.0f;
         float dt = 0.05375f;
-        float dtd = 0.1f;
+        float dtd = 0.5f;
         float xd = 0.0f;
         float yd = 0.0f;
         float ud = 0.0f;
@@ -96,7 +83,7 @@ private:
         float dend0 = 0.0f;
         float den0 = 0.0f;
         float _target_Vind = 0.0f;
-        float tol = 0.1f;
+        float tol = 0.2f;
         float Tcor = 1.0f;
         float errX = 0.0f;
         float errY= 0.0f;
@@ -106,46 +93,13 @@ private:
         float lxstart = 0.0f;
         float lystart = 0.0f;
         float lzstart = 0.0f;
-        float lx = 0.0f;
-        float ly = 0.0f;
-        float lz = 0.0f;
-        float beaconXloc= 0.0f;
-        float beaconYloc = 0.0f;
-        float beaconStartx = 0.0f;
-        float beaconStarty = 0.0f;
-        float xBeacond = 0.0f;
-        float yBeacond = 0.0f;
-        float uBeacond = 0.0f;
-        float vBeacond = 0.0f;
-        float denBd = 0.0f;
-        float omegaBd = 0.0f;
-        float thetaBd = 0.0f;
-        int numBeacon = 100;
-        float diaDetect = 0.0f;
-        float vinBeacon = 0.0f;
-        float curBXloc= 0.0f;
-        float curBYloc = 0.0f;
-        float beaconXlocReadIn= 0.0f;
-        float beaconYlocReadIn = 0.0f;
-        int ii = 0;
-        int curID = 0;
-        double vSmallCircle = 1.0f;
-        double v2SmallCircle = 3.5f;
-        float sumBXloc= 0.0f;
-        float sumBYloc = 0.0f;
-        float diaSmallCircle = 8.0f;
-        bool countTrue = false;
-        float beaconXlocCount= 0.0f;
-        float beaconYlocCount = 0.0f;
-        float totalCircle = 5.3f;
+
 
         // offset information
         float _e_offset = 0.0f;
         float _n_offset = 0.0f;
         float _u_offset = 0.0f;
         int state=0;
-
-
 
         // subscribers
         ros::Subscriber _state_sub;			// the current state of the pixhawk
@@ -157,7 +111,6 @@ ros::Subscriber _landing_pose_sub; // landing pose
 
         // publishers
         ros::Publisher _cmd_pub;
-        ros::Publisher _person_pub;
         // TODO: recommend adding publishers for data you might want to log
 
         // callbacks
@@ -185,7 +138,7 @@ ros::Subscriber _landing_pose_sub; // landing pose
         /**
          * callback for the mission state for the AA241x mission
          * this includes the offset information for the lake lag coordinate frame
-         * @param msg mission state<<endl;
+         * @param msg mission state
          */
         void missionStateCallback(const aa241x_mission::MissionState::ConstPtr& msg);
 
@@ -198,6 +151,7 @@ void landingPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
          */
         void waitForFCUConnection();
 
+
 };
 
 
@@ -209,15 +163,15 @@ _flight_alt(flight_alt-z0off)
         // subscribe to the desired topics
         _state_sub = _nh.subscribe<mavros_msgs::State>("mavros/state", 1, &ControlNode::stateCallback, this);
         _local_pos_sub = _nh.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &ControlNode::localPosCallback, this);
-        _sensor_meas_sub =_nh.subscribe<aa241x_mission::SensorMeasurement>("measurement", 1000, &ControlNode::sensorMeasCallback, this);
+        _sensor_meas_sub =_nh.subscribe<aa241x_mission::SensorMeasurement>("measurement", 10, &ControlNode::sensorMeasCallback, this);
         _mission_state_sub = _nh.subscribe<aa241x_mission::MissionState>("mission_state", 10, &ControlNode::missionStateCallback, this);
-_landing_pose_sub =  _nh.subscribe<geometry_msgs::PoseStamped>("landing_pose", 1, &ControlNode::landingPoseCallback, this);
+_landing_pose_sub =  _nh.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &ControlNode::landingPoseCallback, this);
         // advertise the published detailed
 
         // publish a PositionTarget to the `/mavros/setpoint_raw/local` topic which
         // mavros subscribes to in order to send commands to the pixhawk
         _cmd_pub = _nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 1);
-        _person_pub = _nh.advertise<aa241x_mission::PersonEstimate>("person_found", 10);
+
 }
 
 void ControlNode::stateCallback(const mavros_msgs::State::ConstPtr& msg) {
@@ -246,6 +200,8 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
         current_alt += z0off;
         //float den = sqrt(pow((current_x-x0),2)+pow((current_y-y0),2));
         float den = sqrt(pow((current_x),2)+pow((current_y),2));
+        float dx = -10.0f;
+        float dy  =10.0f;
 
 //        std::cout<<"x0off: "<<x0off<<", y0off: "<<y0off<<", z0off: "<<z0off<<endl;
 
@@ -253,13 +209,164 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 
         // check to see if have completed the waypoint
         // NOTE: for this case we only have a single waypoint
+//        _target_alt = 2;
+
+//        if (_wp_index == 0) {
+//            if(current_x>dx){
+//                _target_Vx = -1;
+//                _target_Vy = 0;
+//                _target_Vz = 0;
+//                if(abs(current_y)>tol){
+//                    _target_Vy = -current_y/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                    std::cout << "targetZ: " << _target_alt << ", currentZ:" << current_alt << ", w:" << _target_Vz << endl;
+//                }
+//            }
+//            else if(current_x>2*dx){
+//                _target_Vx = -2;
+//                _target_Vy = 0;
+//                _target_Vz = 0;
+//                if(abs(current_y)>tol){
+//                    _target_Vy = -current_y/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+//            else if(current_x>3*dx){
+//                _target_Vx = -3;
+//                _target_Vy = 0;
+//                _target_Vz = 0;
+//                if(abs(current_y)>tol){
+//                    _target_Vy = -current_y/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+//            else if(current_x>4*dx){
+//                _target_Vx = -2;
+//                _target_Vy = 0;
+//                _target_Vz = 0;
+//                if(abs(current_y)>tol){
+//                    _target_Vy = -current_y/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+//            else if(current_x>5*dx){
+//                _target_Vx = -1;
+//                _target_Vy = 0;
+//                _target_Vz = 0;
+//                if(abs(current_y)>tol){
+//                    _target_Vy = -current_y/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+
+//            else if (current_y< 1*dy) {
+//                _target_Vx = 0;
+//                _target_Vy = 1;
+//                _target_Vz = 0;
+//                if(abs(current_x-dx*5)>tol){
+//                    _target_Vx = -(current_x-dx*5)/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+//            else if (current_y< 2*dy ) {
+//                _target_Vx = 0;
+//                _target_Vy = 2;
+//                _target_Vz = 0;
+//                if(abs(current_x-dx*5)>tol){
+//                    _target_Vx = -(current_x-dx*5)/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+//            else if (current_y< 3*dy ) {
+//                _target_Vx = 0;
+//                _target_Vy = 3;
+//                _target_Vz = 0;
+//                if(abs(current_x-dx*5)>tol){
+//                    _target_Vx = -(current_x-dx*5)/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+//            else if (current_y< 4*dy) {
+//                _target_Vx = 0;
+//                _target_Vy = 2;
+//                _target_Vz = 0;
+//                if(abs(current_x-dx*5)>tol){
+//                    _target_Vx = -(current_x-dx*5)/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+//            else if (current_y< 5*dy) {
+//                _target_Vx = 0;
+//                _target_Vy = 1;
+//                _target_Vz = 0;
+//                if(abs(current_x-dx*5)>tol){
+//                    _target_Vx = -(current_x-dx*5)/Tcor;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+//            if(current_x<(5*dx) && (current_y>(5*dy))){
+//                _wp_index++;
+//                xfinal = current_x;
+//                yfinal = current_y;
+//                std::cout << "xfinal: " << xfinal << ", yfinal:" << yfinal << endl;
+//            }
+//}
+
+//            if(_wp_index ==1){
+//            if (current_x<(5*dx) && (current_y>(5*dy))){
+//                _target_Vx = 3;
+//                _target_Vy = -3;
+//                _target_Vz = 0;
+//                std::cout << "xfinal: " << xfinal << ", yfinal:" << yfinal << endl;
+//                std::cout << "current_x: " << current_x << ", current_x:" << current_x << endl;
+//                std::cout << "errXx: " << (xfinal+dt*_target_Vx - current_x) << ", errXy:" << (yfinal+dt*_target_Vy - current_y) << endl;
+//                if(abs( (xfinal+dt*_target_Vx - current_x) )>tol){
+//                    _target_Vx = ((xfinal+dt*_target_Vx - current_x)+2*_target_Vx)/Tcor/2;
+//                }
+//                if(abs( (yfinal+dt*_target_Vy - current_y) )>tol){
+//                    _target_Vy = ((yfinal+dt*_target_Vy - current_y)+2*_target_Vy)/Tcor/2;
+//                }
+//                if(abs(current_alt-_target_alt)>tol){
+//                    _target_Vz = -(current_alt-_target_alt)/Tcor;
+//                }
+//            }
+//            else if (abs(current_x)<(1) || (abs(current_y)<(1))){
+//                _target_Vx = 0;
+//                _target_Vy = 0;
+//                _target_Vz = 0;
+//            }
+//            }
+
+
+
+//            std::cout << "u: " << _target_Vx << ", v:" << _target_Vy << ", w:" << _target_Vz << endl;
+//            std::cout << "currentX: " << current_x << ", currentY:" << current_y << ", currentZ:" << current_alt << endl;
 
                if(_wp_index == 0){
-                _target_alt = 30;
-                diaDetect = 5/7*_target_alt+28.75-5;
 
+                _target_alt = 20;
                 _target_x = 0;
-                _target_y = diaDetect;
+                _target_y = 25;
                 _target_Vx = 10*(_target_x-current_x)/den;
                 _target_Vy = 10*(_target_y-current_y)/den;
 
@@ -272,10 +379,6 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
                 if (abs(current_x - _target_x) < 1 || abs(current_y - _target_y) < 1) {
                         // update the target altitude to land, and increment the waypoint
                         _wp_index++;
-                        ID2detect.push_back(100);
-                        IDdetected.push_back(100);
-                        xB2detect.push_back(100);
-                        yB2detect.push_back(100);
                         xd = current_x;
                         yd = current_y;
                         dend0 = sqrt(pow(xd,2)+pow(yd,2));
@@ -285,10 +388,14 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 
 
         if (_wp_index == 1) {
-            curSpiral = floor(thetad/2/M_PI)+1;
-            if(thetad<(curSpiral*2*M_PI - 0.1)){
-                    _target_Vind = _target_Vd/2/M_PI*log((dend0+diaDetect)/dend0);
-                    _target_Vin = _target_V/2/M_PI*log((den0+diaDetect)/den0);
+//            std::cout<<"hello"<<endl;
+            _target_Vd = 5;
+            _target_V = 5;
+            curSpiral = floor(thetad/2/3.14159)+1;
+            if(thetad<(curSpiral*2*3.14159 - 0.1)){
+                    _target_Vind = _target_Vd/2/3.14159*log((dend0+2*25/2)/dend0);
+                    _target_Vin = _target_V/2/3.14159*log((den0+2*25/2)/den0);
+                    count++;
             }
              else {
                  dend0 = dend;
@@ -296,6 +403,29 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
               }
 
             dend = sqrt(pow(xd,2)+pow(yd,2));
+//            errX = dend-den;
+//            _target_Vin = _target_Vind;
+//            if(abs(errX)>tol){
+//                _target_Vin = (_target_Vind+2*errX)/Tcor;
+//                std::cout << "errX: " << errX << ", Vind" << _target_Vind <<  ", Vin" << _target_Vin << endl;
+//            }
+
+//            errY= thetad-theta;
+//            _target_V = _target_Vd;
+//            if(abs(errX)>tol){
+//                _target_V = (_target_Vd+2*errY)/Tcor;
+//                std::cout << "errY: " << errY<< ", Vd" << _target_Vd <<  ", V" << _target_V << endl;
+//            }
+
+//            if(abs(current_alt-_target_alt)>tol){
+//                _target_Vz = -(current_alt-_target_alt)/Tcor;
+//            }
+
+//            _target_V = _target_Vd;
+//            _target_Vin = _target_Vind;
+//            _target_Vx = _target_V *(current_y-y0)/den + _target_Vin * (current_x-x0)/den;
+//            _target_Vy = _target_V * (x0 - current_x)/den + _target_Vin * (current_y-y0)/den;
+
             ud = _target_Vd *(yd-y0)/dend + _target_Vind * (xd-x0)/dend;
             vd = _target_Vd * (x0 - xd)/dend + _target_Vind * (yd-y0)/dend;
             xd = xd+ ud*dtd;
@@ -311,189 +441,32 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
             if(abs(errY)>tol){
                _target_Vy = (vd+2*errY)/Tcor;
              }
+
             _target_Vz=0;
             if(abs(current_alt-_target_alt)>tol){
                 _target_Vz = -(current_alt-_target_alt)/Tcor;
             }
 
-//            std::cout << "errX: " << errX << ", ud: " << ud <<  ", u: " << _target_Vx << ", w: " << _target_Vz <<endl;
-//            std::cout << "errY: " << errX << ", vd: " << vd <<  ", v: " << _target_Vy << endl;
-
-
-//            std::cout<<"numBeacon: "<<numBeacon<<endl;
-//            std::cout<<"beaconXloc: "<<beaconXloc<<", beaconYloc: "<<beaconYloc<<endl;
-//            std::cout<<"currentX: "<<current_x<<", currentY: "<<current_y<<endl;
-
-//            ii = 0;
-                LOOP:
-                countTrue = false;
-//                std::cout<<"sizeID2detect: "<<ID2detect.size()<<", sizeIDdetected: "<<IDdetected.size()<<", ii: "<<ii<<endl;
-//                std::cout<<"xB2detect: "<<xB2detect.size()<<", yB2detect: "<<yB2detect.size()<<", ii: "<<ii<<endl;
-                if(ID2detect.size()!=1){
-                    if((ii+1)<ID2detect.size()){
-                        ii++;
-//                        std::cout<<"ii: "<<ii<<endl;
-                        curID = ID2detect.at(ii);
-                        std::cout<<"1, curID: "<<curID<<endl;
-                        if ( std::find(IDdetected.begin(), IDdetected.end(),curID)==IDdetected.end() ){
-//                            std::cout<<IDdetected.size()<<endl;
-                            IDdetected.push_back(curID);
-                            beaconXloc = xB2detect.at(ii);
-                            beaconYloc = yB2detect.at(ii);
-                            std::cout<<"the: "<<ii<<"th beacon"<<endl;
-                            std::cout<<"xB2detect: "<<beaconXloc<<", yB2detect: "<<beaconYloc<<", ii: "<<ii<<endl;
-//                          if(abs(current_x-beaconXloc)<diaDetect && abs(current_y-beaconYloc)<diaDetect){
-                            curBXloc = beaconXloc;
-                            curBYloc = beaconYloc;
-                            beaconStartx  = current_x;
-                            beaconStarty = current_y;
-//                            beaconXlocCount = curBXloc;
-//                            beaconYlocCount = curBYloc;
-                            sumBXloc = curBXloc;
-                            sumBYloc = curBYloc;
-                            _wp_index++; // go to 2, straight to small circle
-                            count = 1;
-//                          }
-                        }
-                    }
-                }
-
+            std::cout << "errX: " << errX << ", ud: " << ud <<  ", u: " << _target_Vx << ", w: " << _target_Vz <<endl;
+            std::cout << "errY: " << errX << ", vd: " << vd <<  ", v: " << _target_Vy << endl;
 
             omegad = _target_Vd/dend;
             thetad = thetad + omegad*dtd;
+
             omega = _target_V/den;
             theta = theta + omega*dt;
 
-            if(abs(theta-totalCircle*M_PI)<0.1){
-                _wp_index++; // 2
-                _wp_index++; // 3
-                _wp_index++; // 4
-                _wp_index++; // go to stage 5, return home
+
+//            std:cout<<"theta"<<theta<<endl;
+            if(abs(theta-4*3.14159)<0.1){
+                _wp_index++;
             }
-//            std::cout << "xd: " << xd << ", x: " << current_x <<  ",stanfor yd: " << yd <<  ", y: " <<  current_y << endl;
+            std::cout << "xd: " << xd << ", x: " << current_x <<  ", yd: " << yd <<  ", y: " <<  current_y << ", count: " << count<< endl;
         }
 
 
 
-        if(_wp_index == 2){
-            denBd = sqrt(pow((curBXloc- current_x),2)+pow((curBYloc - current_y),2));
-            _target_Vx = v2SmallCircle*(curBXloc-current_x)/denBd;
-            _target_Vy = v2SmallCircle*(curBYloc-current_y)/denBd;
-
-            _target_Vz=0;
-            if(abs(current_alt-_target_alt)>tol){
-                _target_Vz = -(current_alt-_target_alt)/Tcor;
-            }
-//            std::cout<<"curBXloc: "<<curBXloc<<", xcur: "<<current_x<<", curBYloc: "<<curBYloc<<", ycur: "<<current_y<<endl;
-            if(abs(current_x-curBXloc)<diaSmallCircle && abs(current_y-curBYloc)<diaSmallCircle){
-                xBeacond = current_x;
-                yBeacond = current_y;
-                _wp_index++; // go to 3, small circle
-                thetaBd = 0;
-            }
-        }
-
-
-
-
-        if((_wp_index == 3)){
-                denBd = sqrt(pow((curBXloc- xBeacond),2)+pow((curBYloc - yBeacond),2));
-                uBeacond = vSmallCircle *(yBeacond-curBYloc)/denBd ;
-                vBeacond = vSmallCircle * (curBXloc- xBeacond)/denBd;
-                xBeacond = xBeacond+ uBeacond*dtd;
-                yBeacond = yBeacond+ vBeacond*dtd;
-
-                _target_Vx = uBeacond;
-                _target_Vy = vBeacond;
-                errX = xBeacond - current_x;
-                if(abs(errX)>tol){
-                   _target_Vx = (uBeacond+2*errX)/Tcor;
-                 }
-                errY= yBeacond - current_y;
-                if(abs(errY)>tol){
-                   _target_Vy = (vBeacond+2*errY)/Tcor;
-                 }
-                _target_Vz=0;
-                if(abs(current_alt-_target_alt)>tol){
-                    _target_Vz = -(current_alt-_target_alt)/Tcor;
-                }
-                omegaBd = vSmallCircle/denBd;
-                thetaBd = thetaBd + omegaBd*dtd;
-//                std::cout<<"numBeacon,inside: "<<numBeacon<<endl;
-//                std::cout<<"curBXloc: "<<curBXloc<<", curBYloc: "<<curBYloc<<endl;
-//                std::cout<<"xBeacon: "<<xBeacond<<", xcur: "<<current_x<<", yBeacon: "<<yBeacond<<", ycur: "<<current_y<<endl;
-//                std::cout<<"uBeacon: "<<uBeacond<<", u: "<<_target_Vx<<", vBeacon: "<<vBeacond<<", v: "<<_target_Vy<<", vin: "<<vinBeacon<<endl;
-//                std::cout<<"thetaBd: "<<thetaBd<<endl;
-//                std::cout<<"denBd : "<<denBd<<endl;
-
-
-                if(countTrue){
-                    sumBXloc = sumBXloc + beaconXlocCount;
-                    sumBYloc = sumBYloc + beaconYlocCount;
-                    std::cout<<"2, curID: "<<curID<<endl;
-                    std::cout << "beaconXlocCount: "<< beaconXlocCount<<", beaconYlocCount: "<< beaconYlocCount<< ", count: "<<count<<endl;
-//                    std::cout << "sumBX: "<< sumBXloc<<", sumBY: "<< sumBYloc<< endl;
-                    count++;
-                    countTrue = false;
-                }
-
-
-               if(abs(thetaBd - 2*M_PI)<0.1){
-                _wp_index++; // go to 4, back to where start small circle
-               }
-        }
-
-
-
-        if(_wp_index ==4){
-            denBd = sqrt(pow((beaconStartx- current_x),2)+pow((beaconStarty - current_y),2));
-            _target_Vx = v2SmallCircle*(beaconStartx-current_x)/denBd;
-            _target_Vy = v2SmallCircle*(beaconStarty-current_y)/denBd;
-
-            _target_Vz=0;
-            if(abs(current_alt-_target_alt)>tol){
-                _target_Vz = -(current_alt-_target_alt)/Tcor;
-            }
-//            std::cout<<"beaconStartX: "<<beaconStartx<<", xcur: "<<current_x<<", beaconStartY: "<<beaconStarty<<", ycur: "<<current_y<<endl;
-            if(abs(current_x-beaconStartx)<0.5 && abs(current_y-beaconStarty)<0.5){
-                xBeacond = current_x;
-                yBeacond = current_y;
-                _wp_index--; //3
-                _wp_index--; //2
-                _wp_index--; //1
-
-                xBFinal.push_back(sumBXloc/count);
-                yBFinal.push_back(sumBYloc/count);
-                xBcount.push_back(count);
-                yBcount.push_back(count);
-                for(int i=0; i < xBFinal.size(); i++){
-                      std::cout <<"xBFinal: "<<xBFinal.at(i)<<", yBFinal: "<<yBFinal.at(i)<<", count: "<<xBcount.at(i)<<endl;
-                }
-                goto LOOP;
-            }
-        }
-
-
-
-        if(_wp_index==5){
-            // DON'T delete, this is the publish function for beacon for score
-            aa241x_mission::PersonEstimate meas;
-            meas.header.stamp = ros::Time::now();
-
-            for (int i = 0; i < xBFinal.size(); i++) {
-                    // add to the message
-                    meas.id=IDdetected.at(i+1);
-                    meas.n=yBFinal.at(i);
-                    meas.e=xBFinal.at(i);
-                    _person_pub.publish(meas);
-            }
-
-
-            //------------------------------------------------------------
-
-
-
-
+        if(_wp_index==2){
             _target_x = x0off;
             _target_y = y0off;
             _target_Vx = 10*(_target_x-current_x)/den;
@@ -502,70 +475,57 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
             if(abs(current_alt-_target_alt)>tol){
                 _target_Vz = -(current_alt-_target_alt)/Tcor;
             }
-//            std::cout << "u: " << _target_Vx << ", v: " << _target_Vy <<endl;
+            std::cout << "u: " << _target_Vx << ", v: " << _target_Vy <<endl;
             if (abs(current_x - _target_x) < 1 || abs(current_y - _target_y) < 1) {
                     _wp_index++;
                     _target_x = x0off;
                     _target_y = y0off;
-                    _target_alt = -z0off+5;
+                    _target_alt = -z0off+15;
             }
 
         }
 
 
-         if(_wp_index==6){
-             _target_Vz = 10*(_target_alt-current_alt)/den;
-             _target_Vx=0;
-             if(abs(current_x-_target_x)>tol){
-                 _target_Vx = -(current_x-_target_x)/Tcor;
-             }
-             _target_Vy=0;
-             if(abs(current_y-_target_y)>tol){
-                 _target_Vy = -(current_y-_target_y)/Tcor;
-             }
-//             std::cout << "x: " << current_x << ", y: " << current_y<< ", z: " << current_alt <<", zd: " << _target_alt <<endl;
-//             std::cout << "u: " << _target_Vx << ", v: " << _target_Vy<< ", w: " << _target_Vz <<endl;
-             if (abs(current_alt - _target_alt) < 0.1) {
-                     _wp_index++;
-             }
-         }
+        if(_wp_index==3){
+            _target_Vx = 10*(_target_x-current_x)/den;
+            _target_Vy = 10*(_target_y-current_y)/den;
+            _target_Vz = 10*(_target_alt-current_alt)/den;
+            std::cout << "x: " << current_x << ", y: " << current_y<< ", z: " << current_alt <<", zd: " << _target_alt <<endl;
+            std::cout << "u: " << _target_Vx << ", v: " << _target_Vy<< ", w: " << _target_Vz <<endl;
+            if (abs(current_alt - _target_alt) < 0.1) {
+                    _wp_index++;
+                    lxstart = current_x;
+                    lystart = current_y;
+                    lzstart = current_alt;
+            }
+        }
 
 
 
-         if(_wp_index == 7){
-             _target_Vx = 0;
-             _target_Vy = 0;
-             _target_Vz = 0;
-         }
-
-//             while (abs(current_alt - _target_alt) > 0.1){
-//                 _target_x = current_x - lx;
-//                 _target_y = current_y + ly;
-//                 _target_alt = current_alt - lz;
-//                 _target_Vx = 0.5*(_target_x)/den;
-//                 _target_Vy = 0.5*(_target_y)/den;
-//                 _target_Vz = 0.5*(_target_alt)/den;
-//                 std::cout << "x: " << current_x << ", y: " << current_y<< ", z: " << current_alt <<", zd: " << _target_alt <<endl;
-//                 std::cout << "u: " << _target_Vx << ", v: " << _target_Vy<< ", w: " << _target_Vz <<endl;
-//             }
-
-// //            _target_x = current_x - lx;
-// //            _target_y = current_y + ly;
-// //            _target_alt = current_alt - lz;
-// //            _target_Vx = 0.5*(_target_x)/den;
-// //            _target_Vy = 0.5*(_target_y)/den;
-// //            _target_Vz = 0.5*(_target_alt)/den;
-// //            if (abs(current_alt - _target_alt) < 0.1) {
-// //                    _wp_index++;
-// //            }
-//         }
+        if(_wp_index == 4){
+            _target_Vx = 0;
+            _target_Vy = 0;
+            _target_Vz = 0;
+//            _target_x = current_x - lx;
+//            _target_y = current_y + ly;
+//            _target_alt = current_alt - lz;
+//            _target_Vx = 0.5*(_target_x)/den;
+//            _target_Vy = 0.5*(_target_y)/den;
+//            _target_Vz = 0.5*(_target_alt)/den;
+//            if (abs(current_alt - _target_alt) < 0.1) {
+//                    _wp_index++;
+//            }
+        }
 
 
-//         if(_wp_index == 6){
-//                         _target_Vx = 0;
-//                         _target_Vy = 0;
-//                         _target_Vz = 0;
-//         }
+        if(_wp_index == 5){
+                        _target_Vx = 0;
+                        _target_Vy = 0;
+                        _target_Vz = 0;
+        }
+
+
+
 
 
 }
@@ -573,38 +533,7 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 
 void ControlNode::sensorMeasCallback(const aa241x_mission::SensorMeasurement::ConstPtr& msg) {
         // TODO: use the information from the measurement as desired
-        int num = msg->num_measurements;
-//        std::cout<<"total beacon reveiced!!!!!!!!!!!!!!!!!!!!!!!!   "<< num<<"  !!!!!!!!!!!!!!!!!!!!!!!! "<<endl;
-        if (num == 0){
-                return;
-        }
 
-        for(int i=0; i<=num-1; i++){
-                numBeacon = msg->id[i];
-                beaconYlocReadIn = msg->n[i];
-                beaconXlocReadIn = msg->e[i];
-//                std::cout<<"reading beacon location now hahahhahahahahhahahahahahhahahahhahhahhahaha"<<endl;
-//                std::cout<<"numBeacon: "<<num<<endl;
-                if(std::find(ID2detect.begin(), ID2detect.end(),numBeacon)==ID2detect.end()){
-                    ID2detect.push_back(numBeacon);
-                    xB2detect.push_back(beaconXlocReadIn);
-                    yB2detect.push_back(beaconYlocReadIn);
-                    std::cout<<"ID size: "<<ID2detect.size()<<endl;
-                    for(int j=0; j < ID2detect.size(); j++){
-                      std::cout << ID2detect.at(j) << endl;
-                    }
-                }
-
-//                std::cout<<"i,curID: "<<i<<", "<<curID<<endl;
-                if(i==curID){
-                    beaconXlocCount = beaconXlocReadIn;
-                    beaconYlocCount = beaconYlocReadIn;
-                    countTrue =true;
-                    std::cout<<"curID: "<<curID<<", i: "<<i<<endl;
-//                    std::cout<<"beaconXlocCount: "<<beaconXlocCount<<endl;
-                }
-
-        }
         // NOTE: this callback is for an example of how to setup a callback, you may
         // want to move this information to a mission handling node
 }
@@ -621,10 +550,11 @@ void ControlNode::missionStateCallback(const aa241x_mission::MissionState::Const
 
 void  ControlNode::landingPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
     _landing_Pos = *msg;
+    //////////////////////////////@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@/////////////////////////////////////
     float lx=_landing_Pos.pose.position.x;
     float ly=_landing_Pos.pose.position.y;
     float lz=_landing_Pos.pose.position.z;
-//    std::cout << "distance:" << lz; //test tmr
+//    std::cout << "distance:" << lz //test tmr
 }
 
 

@@ -11,7 +11,6 @@
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/PositionTarget.h>
 
-#include <aa241x_mission/PersonEstimate.h>
 #include <aa241x_mission/SensorMeasurement.h>
 #include <aa241x_mission/MissionState.h>
 using namespace std;
@@ -48,10 +47,10 @@ private:
         // data
         mavros_msgs::State _current_state;
         geometry_msgs::PoseStamped _current_local_pos;
-                geometry_msgs::PoseStamped _landing_Pos;
+		geometry_msgs::PoseStamped _landing_Pos;
 
         // waypoint handling (example)
-                std::vector<int> ID;
+		std::vector<int> ID;
                 std::vector<int> ID2detect;
                 std::vector<int> IDdetected;
                 std::vector<float> xB2detect;
@@ -62,12 +61,12 @@ private:
                 std::vector<float> yBcount;
         std::vector<float> p_y;
         std::vector<float> p_x;
-
+        
         int _wp_index = 0;
         int _n_waypoints = 1;
         float _target_alt = 0.0f;
-        float _target_Vd = 4.0f;
-        float _target_V = 4.0f;
+        float _target_Vd = 3.0f;
+        float _target_V = 3.0f;
         float _target_Vin = 0.0f;
         float _target_x = 0.0f;
         float _target_y = 0.0f;
@@ -81,7 +80,7 @@ private:
         float y0off = 0.0f;
         float z0off = 0.0f;
         float dt = 0.05375f;
-        float dtd = 0.1f;
+        float dtd = 0.2f;
         float xd = 0.0f;
         float yd = 0.0f;
         float ud = 0.0f;
@@ -137,7 +136,6 @@ private:
         bool countTrue = false;
         float beaconXlocCount= 0.0f;
         float beaconYlocCount = 0.0f;
-        float totalCircle = 5.3f;
 
         // offset information
         float _e_offset = 0.0f;
@@ -156,8 +154,7 @@ ros::Subscriber _landing_pose_sub; // landing pose
         // TODO: add subscribers here
 
         // publishers
-        ros::Publisher _cmd_pub;
-        ros::Publisher _person_pub;
+        ros::Publisher _cmd_pub;z
         // TODO: recommend adding publishers for data you might want to log
 
         // callbacks
@@ -198,6 +195,7 @@ void landingPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
          */
         void waitForFCUConnection();
 
+
 };
 
 
@@ -217,7 +215,7 @@ _landing_pose_sub =  _nh.subscribe<geometry_msgs::PoseStamped>("landing_pose", 1
         // publish a PositionTarget to the `/mavros/setpoint_raw/local` topic which
         // mavros subscribes to in order to send commands to the pixhawk
         _cmd_pub = _nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 1);
-        _person_pub = _nh.advertise<aa241x_mission::PersonEstimate>("person_found", 10);
+
 }
 
 void ControlNode::stateCallback(const mavros_msgs::State::ConstPtr& msg) {
@@ -364,13 +362,13 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
             omega = _target_V/den;
             theta = theta + omega*dt;
 
-            if(abs(theta-totalCircle*M_PI)<0.1){
+            if(abs(theta-5.3*M_PI)<0.1){
                 _wp_index++; // 2
                 _wp_index++; // 3
                 _wp_index++; // 4
                 _wp_index++; // go to stage 5, return home
             }
-//            std::cout << "xd: " << xd << ", x: " << current_x <<  ",stanfor yd: " << yd <<  ", y: " <<  current_y << endl;
+//            std::cout << "xd: " << xd << ", x: " << current_x <<  ", yd: " << yd <<  ", y: " <<  current_y << endl;
         }
 
 
@@ -476,24 +474,6 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 
 
         if(_wp_index==5){
-            // DON'T delete, this is the publish function for beacon for score
-            aa241x_mission::PersonEstimate meas;
-            meas.header.stamp = ros::Time::now();
-
-            for (int i = 0; i < xBFinal.size(); i++) {
-                    // add to the message
-                    meas.id=IDdetected.at(i+1);
-                    meas.n=yBFinal.at(i);
-                    meas.e=xBFinal.at(i);
-                    _person_pub.publish(meas);
-            }
-
-
-            //------------------------------------------------------------
-
-
-
-
             _target_x = x0off;
             _target_y = y0off;
             _target_Vx = 10*(_target_x-current_x)/den;
