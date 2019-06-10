@@ -120,9 +120,8 @@ private:
         int _wp_index = -2;
         int _n_waypoints = 1;
         float _target_alt = 0.0f;
-        float _target_Vd = 5.0f;
-        float _target_V = 5.0f;
-        float _target_Vin = 0.0f;
+        float _target_Vd = 4.0f;
+        float _target_V = 4.0f;
         float _target_x = 0.0f;
         float _target_y = 0.0f;
         float x0 = 0.0f;
@@ -183,15 +182,15 @@ private:
         float beaconYlocReadIn = 0.0f;
         int ii = 0;
         int curID = 0;
-        double vSmallCircle = 1.0f;
-        double v2SmallCircle = 3.5f;
+        double vSmallCircle = 1.5f;
+        double v2SmallCircle = 4.0f;
         float sumBXloc= 0.0f;
         float sumBYloc = 0.0f;
         float diaSmallCircle = 8.0f;
         bool countTrue = false;
         float beaconXlocCount= 0.0f;
         float beaconYlocCount = 0.0f;
-        float totalCircle = 6.3f;
+        float totalCircle = 3.0f;
 
         // offset information
         float _e_offset = 0.0f;
@@ -219,6 +218,7 @@ ros::Subscriber _landing_pose_sub; // landing pose
         // publishers
         ros::Publisher _cmd_pub;
         ros::Publisher _person_pub;
+ros::Publisher _wp_pub;
         // TODO: recommend adding publishers for data you might want to log
 
         // callbacks
@@ -295,6 +295,7 @@ _landing_pose_sub =  _nh.subscribe<geometry_msgs::PoseStamped>("landing_pose", 1
         // mavros subscribes to in order to send commands to the pixhawk
         _cmd_pub = _nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 1);
         _person_pub = _nh.advertise<aa241x_mission::PersonEstimate>("person_found", 10);
+_wp_pub = _nh.advertise<aa241x_mission::MissionState>("waypoint", 1);
 }
 
 void ControlNode::stateCallback(const mavros_msgs::State::ConstPtr& msg) {
@@ -345,7 +346,7 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
         current_alt += z0off;
         //float den = sqrt(pow((current_x-x0),2)+pow((current_y-y0),2));
         float den = sqrt(pow((current_x),2)+pow((current_y),2));
-
+	std::cout << "-wp: " << _wp_index <<endl;
 
 
 
@@ -368,9 +369,8 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
                if(_wp_index == 0){
                 _target_alt = 30;
                 diaDetect = 5/7*_target_alt+28.75-5;
-
                 _target_x = 0;
-                _target_y = diaDetect;
+                _target_y = diaDetect/2;
                 _target_Vx = 10*(_target_x-current_x)/den;
                 _target_Vy = 10*(_target_y-current_y)/den;
 
@@ -399,8 +399,7 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
         if (_wp_index == 1) {
             curSpiral = floor(thetad/2/M_PI)+1;
             if(thetad<(curSpiral*2*M_PI - 0.1)){
-                    _target_Vind = _target_Vd/2/M_PI*log((dend0+diaDetect)/dend0);
-                    _target_Vin = _target_V/2/M_PI*log((den0+diaDetect)/den0);
+                    _target_Vind = 5/2/M_PI*log((dend0+diaDetect)/dend0)*1.2;
             }
              else {
                  dend0 = dend;
@@ -418,17 +417,25 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
             errX = xd - current_x;
             if(abs(errX)>tol){
                _target_Vx = (ud+2*errX)/Tcor;
+
+
              }
             errY= yd - current_y;
             if(abs(errY)>tol){
                _target_Vy = (vd+2*errY)/Tcor;
+               if((_target_Vy)>=6){
+                   _target_Vy = 6;
+               }
+               if((_target_Vy)<=-6){
+                   _target_Vy = -6;
+               }
              }
             _target_Vz=0;
             if(abs(current_alt-_target_alt)>tol){
                 _target_Vz = -(current_alt-_target_alt)/Tcor;
             }
 
-//            std::cout << "errX: " << errX << ", ud: " << ud <<  ", u: " << _target_Vx << ", w: " << _target_Vz <<endl;
+           // std::cout << "ud: " << ud <<  ", u: " << _target_Vx<< "vd: " << vd <<  ", v: " << _target_Vy<< endl;
 //            std::cout << "errY: " << errX << ", vd: " << vd <<  ", v: " << _target_Vy << endl;
 
 
@@ -579,7 +586,7 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
                 xBcount.push_back(count);
                 yBcount.push_back(count);
                 for(int i=0; i < xBFinal.size(); i++){
-                      std::cout <<"xBFinal: "<<xBFinal.at(i)<<", yBFinal: "<<yBFinal.at(i)<<", count: "<<xBcount.at(i)<<endl;
+                      std::cout <<"ID: "<<ID2detect.at(i)<<", xBFinal: "<<xBFinal.at(i)<<", yBFinal: "<<yBFinal.at(i)<<", count: "<<xBcount.at(i)<<endl;
                 }
                 goto LOOP;
             }
@@ -590,22 +597,22 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
         // GO TO ABOVE THE LANDING SITE DEFINING THE WAYPOINT COORDINATES
         if(_wp_index==5){
             // DON'T delete, this is the publish function for beacon for score
-            aa241x_mission::PersonEstimate meas;
-            meas.header.stamp = ros::Time::now();
+            //aa241x_mission::PersonEstimate meas;
+            //meas.header.stamp = ros::Time::now();
 
-            for (int i = 0; i < xBFinal.size(); i++) {
+            //for (int i = 0; i < xBFinal.size(); i++) {
                     // add to the message
-                    meas.id=IDdetected.at(i+1);
-                    meas.n=yBFinal.at(i);
-                    meas.e=xBFinal.at(i);
-                    _person_pub.publish(meas);
-            }
-            ROS_INFO("MODE 5");
+             //       meas.id=IDdetected.at(i+1);
+             //       meas.n=yBFinal.at(i);
+             //       meas.e=xBFinal.at(i);
+             //       _person_pub.publish(meas);
+            //}
+//            ROS_INFO("MODE 5");
 
                             _wp_index++;
                             PAUL_target_E_lake=PAUL_landing_e_lake;
                             PAUL_target_N_lake=PAUL_landing_n_lake;
-                            PAUL_target_U_lake=40; // HOW DO I KNOW ABOUT THE TARGET ALTITUDE
+                            PAUL_target_U_lake=_u_offset+20; // HOW DO I KNOW ABOUT THE TARGET ALTITUDE
                             PAUL_Kp_x=0.5f;
                             PAUL_Kp_y=0.5f;
                             PAUL_Kp_z=0.5f;
@@ -628,7 +635,7 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
         if (_wp_index == 6) {
 //std::cout<<"Elake: "<<PAUL_target_E_lake<<", Nlake: "<<PAUL_target_N_lake<<endl;
 
-                ROS_INFO("MODE 6");
+//                ROS_INFO("MODE 6");
                 // check condition on being "close enough" to the waypoint
                 if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5) ) {
 
@@ -643,7 +650,7 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
                         _wp_index++;
                         PAUL_target_E_lake=PAUL_landing_e_lake;
                         PAUL_target_N_lake=PAUL_landing_n_lake;
-                        PAUL_target_U_lake=20;
+                        PAUL_target_U_lake=_u_offset+4;
                 }
         }
 
@@ -651,28 +658,229 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 
 
          if (_wp_index == 7) {
-                 //_target_U_lake=_u_offset+_flight_alt;
 
+             aa241x_mission::MissionState results;
+             results.header.stamp = ros::Time::now();
+
+             results.mission_state = _wp_index;
+             _wp_pub.publish(results);
+                 //_target_U_lake=_u_offset+_flight_alt;
+             if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20) {
+                 _wp_index=666;
+                 //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                 //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                 //PAUL_target_U_lake=PAUL_target_U_lake_c;
+             }
                  // check condition on being "close enough" to the waypoint
-                 if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5) && (PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0)) {
+                 if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
 
                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
                          _wp_index++;
-                         PAUL_target_E_lake=PAUL_target_E_lake_c;
-                         PAUL_target_N_lake=PAUL_target_N_lake_c;
-                         PAUL_target_U_lake=PAUL_target_U_lake_c;
+                         PAUL_target_E_lake=PAUL_landing_e_lake+3;
+                         PAUL_target_N_lake=PAUL_landing_n_lake+0;
+                         PAUL_Kp_x=0.3f;
+                         PAUL_Kp_y=0.3f;
+                         PAUL_Kp_z=0.1f;
+                         PAUL_Kd_x=0.3f;
+                         PAUL_Kd_y=0.3f;
+                         PAUL_Kd_z=0.1f;
+
                  }
          }
-         if (_wp_index == 8) {
-                 //_target_U_lake=_u_offset+_flight_alt;
 
+
+
+
+
+
+         if (_wp_index == 8) {
+
+                 if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20) {
+                        _wp_index=666;
+                        //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                        //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                        //PAUL_target_U_lake=PAUL_target_U_lake_c;
+                  }
+                  if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
+
+                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
+                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
+                          _wp_index++;
+                          PAUL_target_E_lake=PAUL_landing_e_lake-3;
+                          PAUL_target_N_lake=PAUL_landing_n_lake-3;
+                  }
+
+         }
+
+         if (_wp_index == 9) {
+
+                 if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20) {
+                        _wp_index=666;
+                        //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                        //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                        //PAUL_target_U_lake=PAUL_target_U_lake_c;
+                  }
+                  if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
+
+                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
+                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
+                          _wp_index++;
+                          PAUL_target_E_lake=PAUL_landing_e_lake+0;
+                          PAUL_target_N_lake=PAUL_landing_n_lake+3;
+                  }
+
+         }
+
+         if (_wp_index == 10) {
+
+                  if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20) {
+                        _wp_index=666;
+                        //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                        //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                        //PAUL_target_U_lake=PAUL_target_U_lake_c;
+                  }
+                  if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
+
+                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
+                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
+                          _wp_index++;
+                          PAUL_target_E_lake=PAUL_landing_e_lake+3;
+                          PAUL_target_N_lake=PAUL_landing_n_lake-3;
+                  }
+
+         }
+
+
+         if (_wp_index == 11) {
+
+                 if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20) {
+                        _wp_index=666;
+                        //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                        //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                        //PAUL_target_U_lake=PAUL_target_U_lake_c;
+                  }
+                  if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
+
+                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
+                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
+                          _wp_index++;
+                          PAUL_target_E_lake=PAUL_landing_e_lake-3;
+                          PAUL_target_N_lake=PAUL_landing_n_lake+0;
+                  }
+
+         }
+
+         if (_wp_index == 12) {
+
+                  if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20){
+                        _wp_index=666;
+                        //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                        //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                        //PAUL_target_U_lake=PAUL_target_U_lake_c;
+                  }
+                  if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
+
+                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
+                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
+                          _wp_index++;
+                          PAUL_target_E_lake=PAUL_landing_e_lake+3;
+                          PAUL_target_N_lake=PAUL_landing_n_lake+3;
+                  }
+
+         }
+
+         if (_wp_index == 13) {
+
+                  if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20) {
+                        _wp_index=666;
+                        //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                        //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                        //PAUL_target_U_lake=PAUL_target_U_lake_c;
+                  }
+                  if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
+
+                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
+                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
+                          _wp_index++;
+                          PAUL_target_E_lake=PAUL_landing_e_lake+0;
+                          PAUL_target_N_lake=PAUL_landing_n_lake-3;
+                  }
+
+         }
+
+         if (_wp_index == 14) {
+
+                  if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20) {
+                        _wp_index=666;
+                        //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                        //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                        //PAUL_target_U_lake=PAUL_target_U_lake_c;
+                  }
+                  if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
+
+                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
+                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
+                          _wp_index++;
+                          PAUL_target_E_lake=PAUL_landing_e_lake-3;
+                          PAUL_target_N_lake=PAUL_landing_n_lake+3;
+                  }
+         }
+
+
+         if (_wp_index == 15) {
+
+                 if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20) {
+                        _wp_index=666;
+                        //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                        //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                        //PAUL_target_U_lake=PAUL_target_U_lake_c;
+                  }
+                  if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
+
+                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
+                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
+                          _wp_index++;
+                          PAUL_target_E_lake=PAUL_landing_e_lake+0;
+                          PAUL_target_N_lake=PAUL_landing_n_lake+0;
+                  }
+         }
+
+
+         if (_wp_index == 16) {
+
+                  if ((PAUL_lx!=0 || PAUL_ly!=0 || PAUL_lz!=0) && abs(PAUL_lz)<20){
+                        _wp_index=666;
+                        //PAUL_target_E_lake=PAUL_target_E_lake_c;
+                        //PAUL_target_N_lake=PAUL_target_N_lake_c;
+                        //PAUL_target_U_lake=PAUL_target_U_lake_c;
+                  }
+                  if ((abs(PAUL_current_local_pos_U_lake - PAUL_target_U_lake) < 0.5) && (abs(PAUL_current_local_pos_N_lake - PAUL_target_N_lake)< 0.5) && (abs(PAUL_current_local_pos_E_lake - PAUL_target_E_lake)< 0.5)) {
+
+                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
+                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
+                          _wp_index++;
+                  }
+         }
+
+
+
+
+         if (_wp_index == 666) {
+                 //_target_U_lake=_u_offset+_flight_alt;
+                PAUL_Kp_x=0.1f;
+                PAUL_Kp_y=0.1f;
+                PAUL_Kp_z=0.1f;
+                PAUL_Kd_x=0.05f;
+                PAUL_Kd_y=0.05f;
+                PAUL_Kd_z=0.1f;
                  // check condition on being "close enough" to the waypoint
-                 if (abs(PAUL_lz)<2) {
+                 if (abs(PAUL_lz)<0.75) {
 
                          //ROS_INFO("valeur de Lake to Drone: %f",_current_local_pos_U_lake);
                          // increment the waypoint to go to the second waypoint "Computing the value of crossing point with line"
                          _wp_index++;
+
 
                  }
          }
@@ -683,35 +891,6 @@ void ControlNode::localPosCallback(const geometry_msgs::PoseStamped::ConstPtr& m
 
          // END PAUL //
 
-
-//             while (abs(current_alt - _target_alt) > 0.1){
-//                 _target_x = current_x - lx;
-//                 _target_y = current_y + ly;
-//                 _target_alt = current_alt - lz;
-//                 _target_Vx = 0.5*(_target_x)/den;
-//                 _target_Vy = 0.5*(_target_y)/den;
-//                 _target_Vz = 0.5*(_target_alt)/den;
-//                 std::cout << "x: " << current_x << ", y: " << current_y<< ", z: " << current_alt <<", zd: " << _target_alt <<endl;
-//                 std::cout << "u: " << _target_Vx << ", v: " << _target_Vy<< ", w: " << _target_Vz <<endl;
-//             }
-
-// //            _target_x = current_x - lx;
-// //            _target_y = current_y + ly;
-// //            _target_alt = current_alt - lz;
-// //            _target_Vx = 0.5*(_target_x)/den;
-// //            _target_Vy = 0.5*(_target_y)/den;
-// //            _target_Vz = 0.5*(_target_alt)/den;
-// //            if (abs(current_alt - _target_alt) < 0.1) {
-// //                    _wp_index++;
-// //            }
-//         }
-
-
-//         if(_wp_index == 6){
-//                         _target_Vx = 0;
-//                         _target_Vy = 0;
-//                         _target_Vz = 0;
-//         }
 
 
 }
@@ -735,10 +914,10 @@ void ControlNode::sensorMeasCallback(const aa241x_mission::SensorMeasurement::Co
                     ID2detect.push_back(numBeacon);
                     xB2detect.push_back(beaconXlocReadIn);
                     yB2detect.push_back(beaconYlocReadIn);
-                    std::cout<<"ID size: "<<ID2detect.size()<<endl;
-                    for(int j=0; j < ID2detect.size(); j++){
-                      std::cout << ID2detect.at(j) << endl;
-                    }
+//                    std::cout<<"ID size: "<<ID2detect.size()<<endl;
+//                    for(int j=0; j < ID2detect.size(); j++){
+//                      std::cout << ID2detect.at(j) << endl;
+//                    }
                 }
 
 //                std::cout<<"i,curID: "<<i<<", "<<curID<<endl;
@@ -746,7 +925,7 @@ void ControlNode::sensorMeasCallback(const aa241x_mission::SensorMeasurement::Co
                     beaconXlocCount = beaconXlocReadIn;
                     beaconYlocCount = beaconYlocReadIn;
                     countTrue =true;
-                    std::cout<<"curID: "<<curID<<", i: "<<i<<endl;
+//                    std::cout<<"curID: "<<curID<<", i: "<<i<<endl;
 //                    std::cout<<"beaconXlocCount: "<<beaconXlocCount<<endl;
                 }
 
@@ -919,10 +1098,30 @@ int ControlNode::run() {
                 //
                 // in this case, just asking the pixhawk to takeoff to the _target_alt
                 // height
+                if((_target_Vx)>=5){
+                    _target_Vx = 5;
+                }
+                if((_target_Vx)<=-5){
+                    _target_Vx = -5;
+                }
+                if((_target_Vy)>=5){
+                    _target_Vy = 5;
+                }
+                if((_target_Vy)<=-5){
+                    _target_Vy = -5;
+                }
+                if((_target_Vz)>=5){
+                    _target_Vz = 5;
+                }
+                if((_target_Vz)<=-5){
+                    _target_Vz = -5;
+                }
                 vel.x = _target_Vx;
                 vel.y = _target_Vy;
                 vel.z = _target_Vz;
 //                pos.z = _target_alt;
+//                std::cout << "velX: " << vel.x << ",velY: " << vel.y <<  ", velZ: " << vel.z  <<endl;
+
 
 
                 //                           PAUL                    //
@@ -960,7 +1159,7 @@ int ControlNode::run() {
                 float PAUL_epsilon_y=-PAUL_current_local_pos_N+PAUL_pos.y;
                 float PAUL_epsilon_z=-PAUL_current_local_pos_U+PAUL_pos.z;
 
-//                std::cout<<"Epsilon error East: "<<PAUL_epsilon_x<<", Epsilon error north lake: "<<PAUL_epsilon_y<<endl;
+//                std::cout<<"Epsilon error altitude: "<<PAUL_epsilon_z<<endl;
                 float PAUL_epsilon_speed_x=PAUL_current_local_speed_E;
                 if(PAUL_epsilon_x>0 && PAUL_current_local_speed_E>0) {
                     PAUL_epsilon_speed_x=PAUL_current_local_speed_E;
@@ -992,7 +1191,7 @@ int ControlNode::run() {
                 } else {
                     PAUL_epsilon_speed_z=-PAUL_current_local_speed_U;
                 }
-
+//                std::cout<<"Epsilon error altitude after modification: "<<PAUL_epsilon_z<<endl;
 
                 //compute the desired yaw to always face the target position
                 PAUL_target_yaw=atan(PAUL_epsilon_y/PAUL_epsilon_x);
@@ -1000,8 +1199,8 @@ int ControlNode::run() {
                     PAUL_target_yaw+=PAUL_pi;
                 }
 
-
-                if (_wp_index == 8) {
+                // WE RELY ON THE CAMERA
+                if (_wp_index == 666) {
                     PAUL_epsilon_x=-PAUL_ly;
                     PAUL_epsilon_y=-PAUL_lx;
                     PAUL_epsilon_z=-PAUL_lz;
@@ -1013,7 +1212,7 @@ int ControlNode::run() {
                 PAUL_vel.x=PAUL_Kp_x*PAUL_epsilon_x + PAUL_Kd_x*PAUL_epsilon_speed_x;
                 PAUL_vel.y=PAUL_Kp_y*PAUL_epsilon_y + PAUL_Kd_y*PAUL_epsilon_speed_y;
                 PAUL_vel.z=PAUL_Kp_z*PAUL_epsilon_z + PAUL_Kd_z*PAUL_epsilon_speed_z;
-
+//                std::cout<<"Velocity required: "<<PAUL_vel.z<<endl;
 
                 if(abs(pow(PAUL_vel.x,2)+pow(PAUL_vel.y,2))>PAUL_u_speed_max) {
                     PAUL_vel.x=PAUL_u_speed_max*cos(PAUL_target_yaw);
@@ -1021,7 +1220,7 @@ int ControlNode::run() {
                 }
 
                 if(abs(PAUL_vel.z)>PAUL_v_z_speed_max) {
-                    PAUL_vel.z=PAUL_v_z_speed_max;
+                    PAUL_vel.z=PAUL_vel.z/abs(PAUL_vel.z)*PAUL_v_z_speed_max;
                 }
 
 
@@ -1033,21 +1232,29 @@ int ControlNode::run() {
                     cmd.yaw=PAUL_pi/2;
                 }
 
-                if(_wp_index == 6 || _wp_index ==7 || _wp_index ==5) {
-                    vel.x=PAUL_vel.x;
+                if(_wp_index==666 ||_wp_index == 6 || _wp_index ==7 || _wp_index ==5 || _wp_index == 8 || _wp_index == 9 || _wp_index == 10 || _wp_index == 11 || _wp_index == 12 || _wp_index == 13 || _wp_index == 14 || _wp_index == 15 || _wp_index == 16|| _wp_index == 17) {
 
+                    vel.x=PAUL_vel.x;
                     vel.y=PAUL_vel.y;
                     vel.z=PAUL_vel.z;
+//                    std::cout<<"UPDATE ON VEL.z: "<<vel.z<<endl;
+                }
+//                std::cout<<"UPDATE ON VEL.z: "<<vel.z<<endl;
+
+
+                if(_wp_index==17) {
+                    vel.z=-0.2;
+                    vel.x=0;
+                    vel.y=0;
+                    PAUL_target_yaw=PAUL_pi/2;
                 }
 
 
-
-
-                if(_wp_index == 8 & abs(vel.z)>0.2) { //CONDTION TO MAKE SURE THE DRONE DON'T GO TO FAST WHEN WE RELY ON CAMERA
+                if(_wp_index == 666 & abs(vel.z)>0.2) { //CONDTION TO MAKE SURE THE DRONE DON'T GO TO FAST WHEN WE RELY ON CAMERA
                     vel.z=-0.2;
                 }
 
-                if(_wp_index==9) {
+                if(_wp_index==667) {
                     vel.z=-0.1;
                     vel.x=0;
                     vel.y=0;
